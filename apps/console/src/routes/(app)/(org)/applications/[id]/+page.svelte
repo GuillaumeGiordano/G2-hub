@@ -28,7 +28,9 @@
 		Pencil,
 		Trash2
 	} from '@lucide/svelte';
+	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
+	import { applicationTabs } from '$lib/records/navigation';
 	import Uploader from '$lib/components/files/Uploader.svelte';
 	import { fileKindLabel, fileStatusLabel, fileStatusVariant } from '$lib/records/files';
 	import { formatBytes } from '$lib/records/organization';
@@ -45,6 +47,7 @@
 	const b = $derived(data.browser);
 	const base = $derived(`/applications/${b.application.id}`);
 	const folderHref = (id: string) => `${base}?dossier=${id}`;
+	const tabs = $derived(applicationTabs(b.application.id, data.canManageKeys));
 
 	const crumbs = $derived([
 		{ label: 'Applications', href: '/applications' },
@@ -242,6 +245,7 @@
 			<Button icon={FolderPlus} onclick={openCreate}>Nouveau dossier</Button>
 		{/if}
 	</SuperTitle>
+	<PageTabs {tabs} />
 
 	{#if b.storageEnabled}
 		<Progress

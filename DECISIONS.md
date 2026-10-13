@@ -144,7 +144,9 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 2a ✅ | Dossiers imbriqués (publics / privés) par application, navigation dans la console |
 | 2b ✅ | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
 | 2c ✅ | Vidéos (ffmpeg, 1080p + poster), file de traitement en base, nettoyage des envois abandonnés |
-| 3 | API publique + clés + CORS + SDK, avec une landing de démo et sa galerie branchée |
+| 3a ✅ | Clés API (publique / secrète) + API de lecture `/api/v1` (dossiers, fichiers) + CORS + cache |
+| 3b | SDK `@g2/hub-client` + landing de démo avec sa galerie branchée |
+| 3c | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
 
@@ -386,8 +388,46 @@ les 10 min et au démarrage), ce qui libère leur réservation de quota.
 ⚠️ **Prérequis** : `ffmpeg` et `ffprobe` installés (`apt install ffmpeg` sur le VPS, `scoop install
 ffmpeg` sous Windows) ; chemins personnalisables avec `FFMPEG_PATH` / `FFPROBE_PATH`.
 
-## 18. Questions ouvertes
+## 18. Visibilité des dossiers (en attente)
 
 ❓ **Changer la visibilité d'un dossier existant** (§15) : pas encore fait. Il faut déplacer tous ses
 fichiers (et ceux de ses sous-dossiers) d'un bucket à l'autre — une tâche de fond qui peut
 s'appuyer sur la file de l'étape 2c. À planifier quand tu le souhaites.
+
+## 19. Clés API et API de lecture (étape 3a)
+
+💡 **Deux types de clés par application** :
+- **publique** `g2_pub_…` : lecture seule des dossiers **publics** ; utilisable dans le code d'un site
+  (navigateur) **depuis ses origines autorisées** — une autre origine est refusée (403) ; sans
+  `Origin` (site rendu côté serveur) elle est acceptée, elle ne lit de toute façon que du public ;
+- **secrète** `g2_sec_…` : lit tout (fichiers privés via des **liens signés de 10 min**) et écrira à
+  l'étape 3c ; **refusée si un navigateur l'envoie** (en-tête `Origin` présent) et **refusée dans
+  l'URL** (une URL finit dans des journaux) — uniquement `Authorization: Bearer`.
+
+💡 **Stockage des clés** : 32 octets aléatoires ; seule l'**empreinte SHA-256** est conservée (une
+clé aléatoire longue n'a pas besoin d'un hachage lent comme un mot de passe) ; la clé complète est
+affichée **une seule fois**, à la création ; ensuite on ne voit que son début (`g2_pub_8fK2xQ1z…`).
+**Révocation** immédiate et définitive ; dernière utilisation enregistrée (au plus toutes les 5 min).
+
+💡 **Une clé désigne à elle seule son organisation et son application** : rien du « locataire »
+n'est lu dans la requête. Un dossier privé, ou d'une autre organisation, répond **404**.
+
+💡 **Endpoints v1** (lecture) :
+- `GET /api/v1/folders?path=Galerie` — le dossier et ses sous-dossiers visibles (sans `path` : la
+  racine de l'application) ;
+- `GET /api/v1/files?path=Galerie/2026` (ou `?folder=<id>`) — les fichiers prêts, du plus récent au
+  plus ancien, avec `url` (version principale), `thumbnailUrl` et toutes les `versions`.
+Chemins insensibles à la casse. Erreurs au format `{ error: { status, message } }`.
+
+💡 **Transmission de la clé publique** : `?key=` accepté (c'est une donnée publique) — cela évite au
+navigateur la requête préalable CORS (OPTIONS) à chaque appel ; `Authorization: Bearer` marche aussi.
+
+💡 **Cache** : réponses à une clé publique `public, max-age=60` (§4) ; à une clé secrète
+`private, no-store` (elles contiennent des liens signés).
+
+⚠️ Pas encore de **limitation de débit** sur l'API publique : à ajouter avant d'ouvrir à des sites
+à fort trafic (ou derrière un CDN).
+
+## 20. Questions ouvertes
+
+❓ **Changer la visibilité d'un dossier existant** — voir §18 (toujours à planifier).

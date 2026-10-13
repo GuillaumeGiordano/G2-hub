@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseForm, requiredString } from '$lib/validation';
 import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
 import { actionFailure, loadFailure } from '$lib/server/http';
+import { can } from '$lib/records/organization';
 import * as folderService from '$lib/server/services/folderService';
 import * as fileService from '$lib/server/services/fileService';
 import type { Actions, PageServerLoad } from './$types';
@@ -19,7 +20,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			browser.folder ? fileService.listFiles(ctx, browser.folder.id) : Promise.resolve([]),
 			fileService.usage(ctx)
 		]);
-		return { browser, files, usage };
+		const canManageKeys = can(ctx.organization.role, ctx.isSuperadmin, 'applications.manage');
+		return { browser, files, usage, canManageKeys };
 	} catch (err) {
 		loadFailure(err);
 	}

@@ -20,6 +20,19 @@ export function listChildren(organizationId: string, applicationId: string, pare
 	});
 }
 
+/** The child of `parentId` named `name` (case-insensitive) — resolves API paths ("Galerie/2026"). */
+export function findChildByName(
+	organizationId: string,
+	applicationId: string,
+	parentId: string | null,
+	name: string
+) {
+	return prisma.folder.findFirst({
+		where: { organizationId, applicationId, parentId, name: { equals: name, mode: 'insensitive' } },
+		select: { id: true, name: true, parentId: true, visibility: true }
+	});
+}
+
 /** Case-insensitive name clash among the siblings (a root folder's siblings are the other roots). */
 export async function nameTaken(
 	organizationId: string,

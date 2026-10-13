@@ -48,6 +48,15 @@ export const NAV: NavSection[] = [
 	}
 ];
 
+/** Tabs of one application's pages. « Clés API » only for those who manage applications. */
+export function applicationTabs(applicationId: string, canManage: boolean) {
+	const base = `/applications/${applicationId}`;
+	return [
+		{ label: 'Fichiers', href: base },
+		...(canManage ? [{ label: 'Clés API', href: `${base}/cles` }] : [])
+	];
+}
+
 /** True when a nav item matches the current path. */
 export function isNavItemActive(item: NavItem, pathname: string): boolean {
 	return item.match === 'exact'

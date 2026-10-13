@@ -21,7 +21,19 @@ const ORGANIZATION_GROUP = '/(app)/(org)';
 const SECURITY_PATH = '/securite';
 const ORGANIZATIONS_PATH = '/organisations';
 
+/** The public API authenticates by API key (lib/server/api), never by session cookie. */
+const PUBLIC_API = '/api/v1/';
+
 export const handle: Handle = async ({ event, resolve }) => {
+	if (event.url.pathname.startsWith(PUBLIC_API)) {
+		event.locals.user = null;
+		event.locals.session = null;
+		event.locals.organization = null;
+		event.locals.orgContext = null;
+		event.locals.requiresTwoFactor = false;
+		return resolve(event);
+	}
+
 	const session = await auth.api.getSession({ headers: event.request.headers });
 	event.locals.user = session?.user ?? null;
 	event.locals.session = session?.session ?? null;

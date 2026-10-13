@@ -29,6 +29,7 @@ model Organization {
   applications Application[]
   folders      Folder[]
   files        StoredFile[]
+  apiKeys      ApiKey[]
   /// Sessions currently working in this organization (cleared if it is deleted).
   sessions     Session[]
 }
@@ -70,6 +71,7 @@ model Application {
   updatedAt      DateTime     @updatedAt
 
   folders Folder[]
+  apiKeys ApiKey[]
 
   @@unique([organizationId, slug])
 }
@@ -160,6 +162,43 @@ model StoredFile {
   @@index([organizationId, status])
 }
 
+// ─── API ─────────────────────────────────────────────────────────────────────
+
+/// What an API key may do (DECISIONS.md §19).
+enum ApiKeyKind {
+  /// Read-only, PUBLIC folders only; usable from a browser, restricted to the app's origins.
+  PUBLISHABLE
+  /// Server-to-server only (refused when sent by a browser); reads everything (private files
+  /// through signed links) and, from step 3c, writes.
+  SECRET
+}
+
+/// An application's API key. Only its SHA-256 hash is stored: the full key is shown ONCE.
+model ApiKey {
+  id             String       @id @default(uuid())
+  /// Denormalized from the application: every query is scoped by organization (§13).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind           ApiKeyKind
+  /// Label given by the owner ("Site vitrine", "Back-office du portail"…).
+  name           String
+  /// First characters of the key, shown in lists to recognize it ("g2_pub_8fK2…").
+  prefix         String
+  /// SHA-256 (hex) of the full key — enough for a long random key (no password to brute-force).
+  hash           String       @unique
+  /// Last authenticated call (refreshed at most every few minutes).
+  lastUsedAt     DateTime?
+  /// Set when revoked: the key stops working at once, the row stays for the audit.
+  revokedAt      DateTime?
+  createdById    String?
+  createdBy      User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, applicationId])
+}
+
 enum MediaJobStatus {
   QUEUED
   RUNNING
@@ -206,6 +245,7 @@ model User {
   twoFactors  TwoFactor[]
   memberships Membership[]
   uploads     StoredFile[]
+  apiKeys     ApiKey[]
 
   @@map("user")
 }

@@ -102,5 +102,8 @@ English code, Conventional Commits).
   component source before using a prop. Note: `Pagination`'s `total` is the PAGE count.
 - **Secrets never reach a browser**: secret API keys are server-to-server only and stored hashed.
 - **The API is a contract**: versioned under `/api/v1`; a breaking change = a new version.
+  `/api/v1` authenticates by API KEY only (lib/server/api: `authenticate` → `ApiContext`, the
+  key alone gives organization + application); the hook skips the session for it. Publishable
+  keys read PUBLIC folders only; secret keys are refused when a browser sends them.
 - Record every validated decision in `DECISIONS.md` (date + decision + why) before or with the
   code that implements it.
