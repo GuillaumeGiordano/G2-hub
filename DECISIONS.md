@@ -147,6 +147,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 3a ✅ | Clés API (publique / secrète) + API de lecture `/api/v1` (dossiers, fichiers) + CORS + cache |
 | 3b ✅ | SDK `@g2/hub-client` + landing de démo avec sa galerie branchée |
 | 3c ✅ | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) + admin de démo |
+| 3d | **Épinglage** des médias utilisés par un site (suppression bloquée dans la console : « utilisé par le site ») + **sélecteur de médiathèque** réutilisable pour les back-offices des sites |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
 
@@ -509,7 +510,39 @@ SDK : `createUpload`, `completeUpload`, `uploadFile` (tout-en-un côté serveur)
 console. Admin de démo (`/admin` de la landing, mot de passe `DEMO_ADMIN_PASSWORD`) : base du site
 simulée par `apps/demo-landing/data/creations.json`.
 
-## 23. Questions ouvertes
+## 23. Trois façons d'alimenter un site
+
+✅ **2026-10-14 — Usages confirmés** :
+1. **Le dossier = la galerie** (sans base côté site) : le site affiche tout le contenu d'un dossier,
+   avec alt et légende de G2 Hub (landing de démo).
+2. **Média d'abord dans G2 Hub, puis une « card » dans le back-office du site** : le back-office
+   propose « Choisir dans la médiathèque » (liste via l'API) — pas de copier-coller d'URL.
+3. **Directement depuis le back-office du site** : la card envoie la photo via G2 Hub (étape 3c).
+
+✅ **2026-10-14 — Le site enregistre l'IDENTIFIANT du fichier, pas son URL** : une URL publique dépend
+de l'adresse du stockage (CDN, changement de bucket…) et une URL privée expire ; le site demande
+l'URL à jour à l'API (et peut la mettre en cache).
+
+✅ **2026-10-14 — Épinglage (étape 3d)** : un média choisi depuis la médiathèque (cas 2) peut avoir été
+envoyé par la console, donc supprimable dans G2 Hub. Le site l'**épingle** via l'API quand il
+l'utilise dans une card : G2 Hub en bloque alors la suppression (« utilisé par le site ») jusqu'à
+ce que le site le libère.
+
+## 24. Utilisateurs des portails et SSO (étape 5)
+
+✅ **2026-10-14 — Comptes cloisonnés par client** : un utilisateur de portail n'existe que dans
+SON application (organisation + application) ; la même adresse e-mail peut avoir des comptes
+distincts chez deux clients. Le client reste responsable de ses utilisateurs (RGPD). Ces comptes
+sont distincts des membres de la console : ils ne peuvent jamais s'y connecter.
+
+✅ **2026-10-14 — Création sur invitation** par l'organisation (console ou API secrète) : e-mail avec
+un lien pour choisir son mot de passe. Un réglage « inscription libre » par application viendra
+plus tard.
+
+✅ **2026-10-14 — E-mails via un SMTP configurable** (`.env`) ; en production une boîte Infomaniak,
+en développement **Mailpit** (Docker) qui attrape tous les e-mails sans rien envoyer.
+
+## 25. Questions ouvertes
 
 ❓ **Distribution du SDK** aux sites clients (dépôts séparés) : registre npm privé, paquet GitHub,
 ou installation depuis le dépôt git (comme `@guillaumeg/ui`) ?
