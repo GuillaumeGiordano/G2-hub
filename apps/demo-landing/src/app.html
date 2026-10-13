@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Anti-flash: apply the persisted light/dark mode before first paint. -->
+		<script>
+			(function () {
+				var d = document.documentElement,
+					dark;
+				try {
+					var m = localStorage.getItem('theme');
+					if (m) dark = m === 'dark';
+				} catch (e) {}
+				if (dark == null) dark = matchMedia('(prefers-color-scheme: dark)').matches;
+				if (dark) d.classList.add('dark');
+			})();
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

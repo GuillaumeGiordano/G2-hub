@@ -71,7 +71,10 @@ apps/console/       SvelteKit: back-office + API. src/hooks.server.ts = central 
                     shared with the browser via FieldErrors). scripts/install.ts = first superadmin.
 packages/db/        @g2-hub/db — Prisma schema, migrations, generated client (exports the CLASS,
                     the console builds its own singleton in src/lib/server/db.ts).
-packages/sdk/       @g2/hub-client — client applications' SDK (step 3).
+packages/sdk/       @g2/hub-client — the client sites' SDK (no dependency, browser + server),
+                    compiled to dist/ (`pnpm --filter @g2/hub-client build`, also on install).
+apps/demo-landing/  Demo client site (port 5190, `pnpm dev:demo`): gallery read server-side with a
+                    publishable key (DEMO_HUB_* in .env) — the template for real client sites.
 docker-compose.yml  Postgres 17 + MinIO with the two buckets (g2hub-public anonymous-read,
                     g2hub-private never public).
 ```

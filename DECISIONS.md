@@ -145,7 +145,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 2b ✅ | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
 | 2c ✅ | Vidéos (ffmpeg, 1080p + poster), file de traitement en base, nettoyage des envois abandonnés |
 | 3a ✅ | Clés API (publique / secrète) + API de lecture `/api/v1` (dossiers, fichiers) + CORS + cache |
-| 3b | SDK `@g2/hub-client` + landing de démo avec sa galerie branchée |
+| 3b ✅ | SDK `@g2/hub-client` + landing de démo avec sa galerie branchée |
 | 3c | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
@@ -428,6 +428,28 @@ navigateur la requête préalable CORS (OPTIONS) à chaque appel ; `Authorizatio
 ⚠️ Pas encore de **limitation de débit** sur l'API publique : à ajouter avant d'ouvrir à des sites
 à fort trafic (ou derrière un CDN).
 
-## 20. Questions ouvertes
+## 20. SDK et landing de démo (étape 3b)
+
+💡 **SDK `@g2/hub-client`** (`packages/sdk`), sans dépendance, pour navigateur et serveur :
+`createHubClient({ baseUrl, key })` puis `hub.files('Galerie/2026')` / `hub.folders()` ; types
+`HubFile`, `HubFolder`… ; `imageSrcset(file)` pour des images responsives. Compilé en JavaScript +
+types (`dist/`) pour être installable par un site hors du monorepo.
+
+💡 Le SDK **refuse une clé secrète dans un navigateur**, passe la clé publique en `?key=` (pas de
+requête préalable CORS) et la secrète en en-tête.
+
+💡 **Repli** (§4) : le SDK garde la dernière réponse réussie de chaque requête et la ressert si le hub
+est **injoignable** (réseau, erreur 5xx) — jamais sur une erreur 4xx (clé révoquée, dossier
+supprimé). Vérifié : hub arrêté, la landing de démo affiche toujours sa galerie.
+
+💡 **Landing de démo** (`apps/demo-landing`, port 5190, `pnpm dev:demo`) : « Boulangerie Côté
+Sud », `HeroSection` + `GallerySection` de `@guillaumeg/ui`, galerie lue **côté serveur** avec une
+clé publique (`.env` : `DEMO_HUB_URL`, `DEMO_HUB_KEY`, `DEMO_GALLERY_PATH`). Elle sert de modèle
+pour les vrais sites clients. Organisation de démonstration conservée dans la base locale.
+
+## 21. Questions ouvertes
+
+❓ **Distribution du SDK** aux sites clients (dépôts séparés) : registre npm privé, paquet GitHub,
+ou installation depuis le dépôt git (comme `@guillaumeg/ui`) ?
 
 ❓ **Changer la visibilité d'un dossier existant** — voir §18 (toujours à planifier).

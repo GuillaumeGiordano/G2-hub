@@ -78,6 +78,49 @@ importers:
         specifier: ^8.0.16
         version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)
 
+  apps/demo-landing:
+    dependencies:
+      '@g2/hub-client':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@guillaumeg/ui':
+        specifier: github:GuillaumeGiordano/my-components
+        version: https://codeload.github.com/GuillaumeGiordano/my-components/tar.gz/d566b5e56ef7c34939ee8f1cee6b7e405f838fae(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)
+      '@lucide/svelte':
+        specifier: ^1.22.0
+        version: 1.55.0(svelte@5.57.2)
+    devDependencies:
+      '@sveltejs/adapter-node':
+        specifier: ^5.5.7
+        version: 5.5.7(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))
+      '@sveltejs/kit':
+        specifier: ^2.63.0
+        version: 2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^7.1.2
+        version: 7.3.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15))
+      '@tailwindcss/vite':
+        specifier: ^4.3.1
+        version: 4.3.3(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15))
+      sass-embedded:
+        specifier: ^1.100.0
+        version: 1.105.1
+      svelte:
+        specifier: ^5.56.1
+        version: 5.57.2
+      svelte-check:
+        specifier: ^4.6.0
+        version: 4.7.6(picomatch@4.0.7)(svelte@5.57.2)(typescript@6.0.3)
+      tailwindcss:
+        specifier: ^4.3.1
+        version: 4.3.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)
+
   packages/db:
     dependencies:
       '@prisma/adapter-pg':
