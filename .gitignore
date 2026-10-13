@@ -20,3 +20,8 @@ Thumbs.db
 
 # Demo site database (apps/demo-landing)
 apps/demo-landing/data
+
+# Personal notes (kept locally, never committed)
+CLAUDE.md
+DECISIONS.md
+TODO.md
