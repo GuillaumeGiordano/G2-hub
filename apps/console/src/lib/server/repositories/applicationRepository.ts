@@ -13,6 +13,13 @@ export function listApplications(organizationId: string) {
 	});
 }
 
+export function findApplication(organizationId: string, id: string) {
+	return prisma.application.findFirst({
+		where: { id, organizationId },
+		select: { id: true, name: true }
+	});
+}
+
 export async function slugTakenInOrganization(organizationId: string, slug: string, excludeId?: string) {
 	const found = await prisma.application.findUnique({
 		where: { organizationId_slug: { organizationId, slug } },

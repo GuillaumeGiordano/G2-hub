@@ -141,7 +141,9 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 |---|---|
 | 0 ✅ | Scaffold du monorepo, Docker (Postgres + MinIO), Better Auth, layout de la console, script d'installation (1er superadmin) |
 | 1 ✅ | Organisations, membres et rôles, applications |
-| 2 | Dossiers (publics / privés) et fichiers : upload présigné, traitement images / vidéos / PDF, CRUD dans la console, **blocage au quota (1 Go)** |
+| 2a ✅ | Dossiers imbriqués (publics / privés) par application, navigation dans la console |
+| 2b | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
+| 2c | Vidéos (ffmpeg, 1080p + poster), PDF, file de traitement en base |
 | 3 | API publique + clés + CORS + SDK, avec une landing de démo et sa galerie branchée |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
@@ -307,6 +309,26 @@ en revanche, **conserve** les comptes de ses membres.
 (`https://monsite.fr`, `http://localhost:5173`), barre finale retirée, doublons fusionnés,
 20 maximum.
 
-## 15. Questions ouvertes
+## 15. Choix d'implémentation de l'étape 2a (dossiers)
+
+💡 **Les dossiers appartiennent à une application** (pas directement à l'organisation), conformément
+au modèle §3 ; le quota, lui, reste global à l'organisation.
+
+💡 **Visibilité** : choisie à la création d'un dossier **racine** ; un sous-dossier **hérite toujours**
+de celle de son parent (le choix envoyé est ignoré). Changer la visibilité d'un dossier existant
+n'est pas proposé pour l'instant : il faudra déplacer ses fichiers d'un bucket à l'autre (tâche de
+fond, à prévoir avec l'étape 2c).
+
+💡 **Noms** : 80 caractères maximum, sans `/` ni `\`, uniques **sans tenir compte de la casse** parmi
+les dossiers frères (« Galerie » et « galerie » ne peuvent pas coexister au même niveau).
+
+💡 **Suppression** d'un dossier = suppression de **tout son contenu** (sous-dossiers, et fichiers à
+partir de l'étape 2b — y compris sur S3), après confirmation.
+
+💡 Dossiers et fichiers **visibles par tous les membres** ; création / renommage / suppression à
+partir du rôle `editor`. Une organisation en offre « Accès » (sans stockage) ne peut pas créer de
+dossier.
+
+## 16. Questions ouvertes
 
 Aucune pour l'instant.

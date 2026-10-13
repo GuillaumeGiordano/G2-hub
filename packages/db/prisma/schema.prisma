@@ -27,6 +27,7 @@ model Organization {
 
   memberships  Membership[]
   applications Application[]
+  folders      Folder[]
   /// Sessions currently working in this organization (cleared if it is deleted).
   sessions     Session[]
 }
@@ -67,7 +68,39 @@ model Application {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  folders Folder[]
+
   @@unique([organizationId, slug])
+}
+
+// ─── Storage ─────────────────────────────────────────────────────────────────
+
+/// Who may read the files of a folder (DECISIONS.md §7). Each visibility lives in its own bucket.
+enum Visibility {
+  /// Anonymously readable by direct URL (images, videos, PDFs shown on a client site).
+  PUBLIC
+  /// Never readable without a short-lived signed link (personal files).
+  PRIVATE
+}
+
+/// A folder of an application. Folders nest; a subfolder always has its parent's visibility.
+model Folder {
+  id             String       @id @default(uuid())
+  /// Denormalized from the application: every query is scoped by organization (§13).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// null = a root folder of the application.
+  parentId       String?
+  parent         Folder?      @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Folder[]     @relation("FolderTree")
+  name           String
+  visibility     Visibility
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, applicationId, parentId])
 }
 
 // ─── Authentication (Better Auth) ────────────────────────────────────────────

@@ -27,6 +27,8 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1149.0",
+		"@aws-sdk/s3-request-presigner": "^3.1149.0",
 		"@g2-hub/db": "workspace:*",
 		"@guillaumeg/ui": "github:GuillaumeGiordano/my-components",
 		"@lucide/svelte": "^1.22.0",

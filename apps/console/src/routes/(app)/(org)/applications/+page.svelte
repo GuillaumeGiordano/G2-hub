@@ -78,7 +78,7 @@
 </script>
 
 {#snippet nameCell(app: ApplicationListItem)}
-	<div class="strong">{app.name}</div>
+	<a class="app-link strong" href={`/applications/${app.id}`}>{app.name}</a>
 	<div class="slug">{app.slug}</div>
 {/snippet}
 
@@ -213,6 +213,13 @@
 </Modal>
 
 <style>
+	.app-link {
+		text-decoration: none;
+	}
+	.app-link:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
 	.slug {
 		font-size: 12px;
 		color: var(--text-subtle);
