@@ -143,7 +143,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 1 ✅ | Organisations, membres et rôles, applications |
 | 2a ✅ | Dossiers imbriqués (publics / privés) par application, navigation dans la console |
 | 2b ✅ | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
-| 2c | Vidéos (ffmpeg, 1080p + poster), PDF, file de traitement en base |
+| 2c ✅ | Vidéos (ffmpeg, 1080p + poster), file de traitement en base, nettoyage des envois abandonnés |
 | 3 | API publique + clés + CORS + SDK, avec une landing de démo et sa galerie branchée |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
@@ -361,10 +361,33 @@ objets sur le stockage, puis les lignes — l'espace est libéré immédiatement
 ⚠️ **À prévoir en prod** : le bucket Infomaniak doit autoriser en **CORS** les `PUT` venant du
 domaine de la console (MinIO l'autorise par défaut en dev). À faire au déploiement.
 
-⚠️ **Envois abandonnés** (onglet fermé avant la fin) : le fichier reste « Envoi… » et sa réservation
-compte dans le quota jusqu'à sa suppression. Un nettoyage automatique (après 1 h) arrive avec la
-file de traitement de l'étape 2c.
+~~⚠️ **Envois abandonnés**~~ — réglé à l'étape 2c (nettoyage automatique après 1 h, §17).
 
-## 17. Questions ouvertes
+## 17. Choix d'implémentation de l'étape 2c (vidéos)
 
-Aucune pour l'instant.
+💡 **Vidéos converties en tâche de fond** : la confirmation d'envoi met la vidéo dans une **file en
+base** (`MediaJob`, pas de Redis) et répond aussitôt (« Traitement… ») ; un **worker unique** dans
+le processus la traite (repris de ShareMoment) : une tâche à la fois, `nice -n 19` sur le VPS,
+2 threads ffmpeg, 3 essais max, reprise des tâches interrompues au redémarrage.
+
+💡 **Format de sortie** : H.264 (High, yuv420p) + AAC 128k, MP4 `faststart` (lecture avant la fin du
+téléchargement), dans un cadre 1920×1080 quelle que soit l'orientation (une vidéo portrait reste
+portrait), jamais agrandie ; poster WebP (1280 px max) pris vers 1 s. Les vidéos HEVC d'iPhone
+(.mov) sont donc lisibles partout.
+
+💡 ffmpeg lit l'original **directement depuis son lien signé** (pas de copie du fichier brut sur le
+disque du VPS) ; seuls la vidéo convertie et le poster passent par un dossier temporaire.
+
+💡 **Envois abandonnés** (ticket pris, rien confirmé depuis 1 h) : supprimés par le worker (toutes
+les 10 min et au démarrage), ce qui libère leur réservation de quota.
+
+💡 La console **se rafraîchit toute seule** (toutes les 5 s) tant qu'une vidéo est en traitement.
+
+⚠️ **Prérequis** : `ffmpeg` et `ffprobe` installés (`apt install ffmpeg` sur le VPS, `scoop install
+ffmpeg` sous Windows) ; chemins personnalisables avec `FFMPEG_PATH` / `FFPROBE_PATH`.
+
+## 18. Questions ouvertes
+
+❓ **Changer la visibilité d'un dossier existant** (§15) : pas encore fait. Il faut déplacer tous ses
+fichiers (et ceux de ses sous-dossiers) d'un bucket à l'autre — une tâche de fond qui peut
+s'appuyer sur la file de l'étape 2c. À planifier quand tu le souhaites.

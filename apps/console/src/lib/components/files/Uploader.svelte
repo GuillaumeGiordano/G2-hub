@@ -88,7 +88,7 @@
 	{#key round}
 		<FileInput
 			label="Ajouter des fichiers"
-			hint="Images (JPEG, PNG, WebP, GIF, AVIF — 20 Mo max) ou PDF (20 Mo max). Glissez-les ou cliquez."
+			hint="Images (JPEG, PNG, WebP, GIF, AVIF) et PDF : 20 Mo max. Vidéos (MP4, MOV, WebM) : 200 Mo max, converties en 1080p. Glissez-les ou cliquez."
 			accept={ACCEPT_ATTRIBUTE}
 			multiple
 		/>

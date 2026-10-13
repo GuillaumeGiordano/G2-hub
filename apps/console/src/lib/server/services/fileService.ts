@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { prisma } from '$lib/server/db';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
+import * as jobRepo from '$lib/server/repositories/mediaJobRepository';
+import { processVideo } from '$lib/server/media/video';
+import { wakeWorker } from '$lib/server/media/signal';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { HubError, notFound } from '$lib/server/errors';
 import * as storage from '$lib/server/storage/s3';
@@ -113,6 +119,13 @@ export async function completeUpload(ctx: OrgContext, applicationId: string, fil
 	if (!received) throw new HubError("Le fichier n'a pas été reçu. Réessayez l'envoi.");
 	await fileRepo.updateFile(organizationId, fileId, { status: 'PROCESSING' });
 
+	// A video takes minutes to transcode: queued for the background worker, never in the request.
+	if (file.kind === 'VIDEO') {
+		await jobRepo.enqueue(fileId);
+		wakeWorker();
+		return;
+	}
+
 	try {
 		const { variants, width, height } = await processOriginal({ ...file, originalKey: file.originalKey });
 		await fileRepo.updateFile(organizationId, fileId, {
@@ -149,8 +162,8 @@ export async function listFiles(ctx: OrgContext, folderId: string): Promise<File
 	return Promise.all(
 		rows.map(async (f) => {
 			const variants = f.variants as StoredVariant[];
-			const thumb = variants.find((v) => v.name === 'thumb');
-			const full = variants.find((v) => v.name === 'large') ?? variants.find((v) => v.name === 'document');
+			const thumb = variants.find((v) => v.name === 'thumb' || v.name === 'poster');
+			const full = variants.find((v) => v.name === 'large' || v.name === 'video' || v.name === 'document');
 			return {
 				id: f.id,
 				name: f.name,
@@ -176,4 +189,70 @@ export async function deleteFile(ctx: OrgContext, applicationId: string, fileId:
 	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
 	await purgeObjects([file]);
 	await fileRepo.deleteFile(ctx.organization.id, fileId);
+}
+
+// ─── Background work (called by the media worker: no session) ───────────────
+
+/** Transcode a queued video: H.264 1080p + poster into the folder's bucket, then drop the original.
+ *  Throws on failure — the worker retries, then calls `failVideo`. */
+export async function processQueuedVideo(fileId: string): Promise<void> {
+	const file = await fileRepo.findFileForWorker(fileId);
+	if (!file || file.status !== 'PROCESSING' || !file.originalKey) return; // deleted meanwhile
+	const dir = await mkdtemp(join(tmpdir(), 'g2hub-'));
+	try {
+		// ffmpeg reads the original from a signed link valid for the whole run.
+		const sourceUrl = await storage.presignDownload('PRIVATE', file.originalKey, 60 * 60);
+		const out = await processVideo(sourceUrl, dir);
+		const videoKey = `${file.storagePrefix}video.mp4`;
+		const posterKey = `${file.storagePrefix}poster.webp`;
+		await storage.putFile(file.visibility, videoKey, out.videoPath, 'video/mp4');
+		await storage.putFile(file.visibility, posterKey, out.posterPath, 'image/webp');
+		const variants: StoredVariant[] = [
+			{
+				name: 'video',
+				key: videoKey,
+				contentType: 'video/mp4',
+				bytes: out.videoBytes,
+				width: out.width ?? undefined,
+				height: out.height ?? undefined
+			},
+			{ name: 'poster', key: posterKey, contentType: 'image/webp', bytes: out.posterBytes }
+		];
+		await fileRepo.updateFileForWorker(fileId, {
+			status: 'READY',
+			variants,
+			width: out.width,
+			height: out.height,
+			// The reservation becomes the real size of what is kept (§10).
+			bytes: BigInt(out.videoBytes + out.posterBytes),
+			originalKey: null
+		});
+		await storage.deleteObjects('PRIVATE', [file.originalKey]).catch(() => {});
+	} finally {
+		await rm(dir, { recursive: true, force: true }).catch(() => {});
+	}
+}
+
+/** Give up on a video after the last attempt: FAILED, nothing counted, every object removed. */
+export async function failVideo(fileId: string): Promise<void> {
+	const file = await fileRepo.findFileForWorker(fileId);
+	if (!file) return;
+	await storage.deleteObjects(file.visibility, possibleKeys(file.storagePrefix)).catch(() => {});
+	if (file.originalKey) await storage.deleteObjects('PRIVATE', [file.originalKey]).catch(() => {});
+	await fileRepo.updateFileForWorker(fileId, {
+		status: 'FAILED',
+		error: 'Vidéo illisible ou format non pris en charge.',
+		bytes: 0n,
+		originalKey: null
+	});
+}
+
+/** Uploads never confirmed for an hour (tab closed, network lost): delete them, which also releases
+ *  their quota reservation (§10). Returns how many were removed. */
+export async function cleanupAbandonedUploads(maxAgeMs = 60 * 60_000): Promise<number> {
+	const abandoned = await fileRepo.listAbandonedUploads(new Date(Date.now() - maxAgeMs));
+	if (!abandoned.length) return 0;
+	await purgeObjects(abandoned);
+	await fileRepo.deleteFilesForWorker(abandoned.map((f) => f.id));
+	return abandoned.length;
 }

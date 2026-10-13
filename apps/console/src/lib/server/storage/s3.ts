@@ -6,6 +6,8 @@ import {
 	S3Client
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { env } from '$env/dynamic/private';
 import type { Visibility } from '$lib/records/storage';
 
@@ -90,6 +92,22 @@ export async function putObject(visibility: Visibility, key: string, body: Uint8
 			Bucket: bucketOf(visibility),
 			Key: key,
 			Body: body,
+			ContentType: contentType,
+			CacheControl: 'public, max-age=31536000, immutable'
+		})
+	);
+}
+
+/** Store a processed version from a local file, streamed (a transcoded video can weigh hundreds
+ *  of MB: never loaded in memory). Same immutable cache as `putObject`. */
+export async function putFile(visibility: Visibility, key: string, path: string, contentType: string) {
+	const { size } = await stat(path);
+	await s3.send(
+		new PutObjectCommand({
+			Bucket: bucketOf(visibility),
+			Key: key,
+			Body: createReadStream(path),
+			ContentLength: size,
 			ContentType: contentType,
 			CacheControl: 'public, max-age=31536000, immutable'
 		})

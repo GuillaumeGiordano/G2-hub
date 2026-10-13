@@ -152,11 +152,35 @@ model StoredFile {
   error          String?
   uploadedById   String?
   uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  jobs           MediaJob[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId, folderId])
   @@index([organizationId, status])
+}
+
+enum MediaJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Background processing queue (DECISIONS.md §5): a video is transcoded outside the HTTP request.
+/// Database-backed — nothing extra to run on the VPS, and queued work survives a restart.
+model MediaJob {
+  id         String         @id @default(uuid())
+  fileId     String
+  file       StoredFile     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  status     MediaJobStatus @default(QUEUED)
+  attempts   Int            @default(0)
+  lastError  String?
+  createdAt  DateTime       @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
 }
 
 // ─── Authentication (Better Auth) ────────────────────────────────────────────

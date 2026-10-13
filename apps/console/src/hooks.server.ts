@@ -1,7 +1,13 @@
-import { redirect, type Handle } from '@sveltejs/kit';
+import { redirect, type Handle, type ServerInit } from '@sveltejs/kit';
 import { auth } from '$lib/server/auth';
 import { isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
 import { membershipsOf, resolveActiveOrganization } from '$lib/server/services/organizationService';
+import { startMediaWorker } from '$lib/server/media/worker';
+
+// One media worker per process: transcodes queued videos and removes abandoned uploads.
+export const init: ServerInit = () => {
+	startMediaWorker();
+};
 
 // Central authorization. `event.route.id` carries the (group) segments — e.g.
 // "/(app)/(org)/membres" — whereas the URL does not. Guarding by that prefix here covers pages AND

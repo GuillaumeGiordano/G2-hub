@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		Alert,
 		Badge,
@@ -51,6 +52,14 @@
 		...b.crumbs.map((c) => ({ label: c.name, href: folderHref(c.id) })),
 		...(b.folder ? [{ label: b.folder.name }] : [])
 	]);
+
+	// While a video is being transcoded in the background, refresh the list until it is ready.
+	const processing = $derived(data.files.some((f) => f.status === 'PROCESSING'));
+	$effect(() => {
+		if (!processing) return;
+		const timer = setInterval(() => invalidateAll(), 5000);
+		return () => clearInterval(timer);
+	});
 
 	const usagePercent = $derived(Math.min(100, Math.round((data.usage.usedBytes / data.usage.quotaBytes) * 100)));
 	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' });

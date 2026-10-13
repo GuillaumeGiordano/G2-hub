@@ -95,6 +95,29 @@ export async function updateFile(
 	return count;
 }
 
+// ─── System access (background worker: no session, no organization) ─────────
+// Only the media worker calls these: it acts on queued files, never on browser input.
+
+export function findFileForWorker(id: string) {
+	return prisma.storedFile.findUnique({ where: { id }, select: fileSelect });
+}
+
+export function updateFileForWorker(id: string, data: Prisma.StoredFileUpdateInput) {
+	return prisma.storedFile.update({ where: { id }, data, select: { id: true } });
+}
+
+/** Uploads started before `before` and never confirmed (tab closed, network lost…). */
+export function listAbandonedUploads(before: Date) {
+	return prisma.storedFile.findMany({
+		where: { status: 'UPLOADING', createdAt: { lt: before } },
+		select: { id: true, visibility: true, originalKey: true, variants: true }
+	});
+}
+
+export function deleteFilesForWorker(ids: string[]) {
+	return prisma.storedFile.deleteMany({ where: { id: { in: ids } } });
+}
+
 export async function deleteFile(organizationId: string, id: string) {
 	const { count } = await prisma.storedFile.deleteMany({ where: { id, organizationId } });
 	return count;

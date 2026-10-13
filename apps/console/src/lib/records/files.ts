@@ -17,13 +17,16 @@ export const MAX_BYTES: Record<FileKind, number> = {
 };
 
 /** Accepted types → kind. HEIC (iPhone photos) is not decodable server-side: export as JPEG.
- *  Videos are accepted from step 2c (transcoding). */
+ *  Every video is transcoded to H.264 MP4 (iPhone HEVC .mov included). */
 export const ACCEPTED_TYPES: Record<string, FileKind> = {
 	'image/jpeg': 'IMAGE',
 	'image/png': 'IMAGE',
 	'image/webp': 'IMAGE',
 	'image/gif': 'IMAGE',
 	'image/avif': 'IMAGE',
+	'video/mp4': 'VIDEO',
+	'video/quicktime': 'VIDEO',
+	'video/webm': 'VIDEO',
 	'application/pdf': 'PDF'
 };
 
@@ -57,7 +60,7 @@ export const fileStatusVariant: Record<FileStatus, 'default' | 'info' | 'success
 /** Why a file cannot be uploaded (type / size), or null when it may. */
 export function uploadRefusal(file: { type: string; size: number }): string | null {
 	const kind = kindOf(file.type);
-	if (!kind) return 'Type non accepté (images JPEG, PNG, WebP, GIF, AVIF ou PDF).';
+	if (!kind) return 'Type non accepté (images JPEG, PNG, WebP, GIF, AVIF ; vidéos MP4, MOV, WebM ; PDF).';
 	if (file.size <= 0) return 'Fichier vide.';
 	if (file.size > MAX_BYTES[kind]) return `Trop volumineux : ${MAX_BYTES[kind] / MB} Mo maximum.`;
 	return null;

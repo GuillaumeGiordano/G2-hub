@@ -24,8 +24,8 @@ hub measures usage and enforces quotas.
 and a delivered copy installed on a client's own server (one organization, which they customize).
 Nothing specific to G2 WebDev is hard-coded — instance name, domain, S3, mail come from `.env`.
 
-Status: **step 1 done** (organizations, members & roles, applications, active organization in the
-session, tenant isolation). Every
+Status: **step 2 done** (organizations, members & roles, applications; folders and files on S3 with
+quota, image / video processing and a background media worker). Every
 validated choice is logged in `DECISIONS.md` (read it first; it is the source of truth for scope,
 architecture and the step-by-step roadmap).
 
@@ -43,6 +43,13 @@ pnpm db:down        # stop the Docker services
 ```
 
 There is no test suite. Verify changes by driving the dev server.
+
+**Media**: `ffmpeg` + `ffprobe` must be installed (PATH, or `FFMPEG_PATH` / `FFPROBE_PATH`). Videos are
+transcoded by ONE in-process worker (`lib/server/media/worker.ts`, started in `hooks.server.ts`
+`init`) that drains the `MediaJob` table and also removes uploads never confirmed for 1 h.
+
+**After a migration, restart the dev server**: it keeps the previous Prisma client in memory. On
+Windows, stopping `pnpm dev` may leave Vite's `node` process alive on port 5180 — kill it too.
 
 **Migrations**: never rewrite an applied migration; a schema change = a NEW migration.
 `prisma migrate dev` fails in a non-interactive shell → write the SQL with

@@ -15,7 +15,12 @@ export type StoredVariant = {
 /** Every key a file's processing may write under its prefix — used to clean up after a failure,
  *  when some versions were stored before the error. */
 export function possibleKeys(storagePrefix: string): string[] {
-	return [...Object.keys(IMAGE_WIDTHS).map((n) => `${storagePrefix}${n}.webp`), `${storagePrefix}document.pdf`];
+	return [
+		...Object.keys(IMAGE_WIDTHS).map((n) => `${storagePrefix}${n}.webp`),
+		`${storagePrefix}video.mp4`,
+		`${storagePrefix}poster.webp`,
+		`${storagePrefix}document.pdf`
+	];
 }
 
 /** Delete the stored objects of files: their processed versions + any leftover original. */
