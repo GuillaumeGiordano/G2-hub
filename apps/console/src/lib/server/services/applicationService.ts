@@ -9,9 +9,13 @@ import type { ApplicationListItem } from '$lib/viewmodels/application';
 // Applications of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13). Every
 // member sees them; owners (and the superadmin) create, edit and delete them.
 
-export function listApplications(ctx: OrgContext): Promise<ApplicationListItem[]> {
+export async function listApplications(ctx: OrgContext): Promise<ApplicationListItem[]> {
 	assertCan(ctx, 'read');
-	return appRepo.listApplications(ctx.organization.id);
+	const [apps, siteFiles] = await Promise.all([
+		appRepo.listApplications(ctx.organization.id),
+		fileRepo.countSiteFilesByApplication(ctx.organization.id)
+	]);
+	return apps.map((a) => ({ ...a, siteFileCount: siteFiles.get(a.id) ?? 0 }));
 }
 
 /** A slug free within the organization: "site", then "site-2", "-3"… */

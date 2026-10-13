@@ -37,7 +37,7 @@ export function searchOrganizations(params: {
 			slug: true,
 			quotaBytes: true,
 			storageEnabled: true,
-			_count: { select: { memberships: true, applications: true } },
+			_count: { select: { memberships: true, applications: true, files: { where: { source: 'API' } } } },
 			memberships: { where: { userId: params.userId }, select: { role: true } }
 		}
 	});

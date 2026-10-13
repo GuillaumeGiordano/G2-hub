@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/state';
 	import {
+		Alert,
 		Badge,
 		Button,
 		ButtonAction,
@@ -285,6 +286,15 @@
 		Supprimer <strong>{toDelete?.name}</strong> ? Ses applications et ses accès sont supprimés. Les
 		comptes de ses membres sont conservés. Cette action est <strong>irréversible</strong>.
 	</p>
+	{#if toDelete?.siteFileCount}
+		<div class="warning">
+			<Alert variant="warning" title="Fichiers envoyés par ses sites">
+				{toDelete.siteFileCount} fichier{toDelete.siteFileCount > 1 ? 's' : ''} envoyé{toDelete.siteFileCount > 1 ? 's' : ''}
+				par ses sites {toDelete.siteFileCount > 1 ? 'seront supprimés' : 'sera supprimé'} : les sites ne pourront plus
+				{toDelete.siteFileCount > 1 ? 'les afficher' : 'l’afficher'}.
+			</Alert>
+		</div>
+	{/if}
 	<form
 		method="POST"
 		action="?/delete"
@@ -319,6 +329,9 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.warning {
+		margin-bottom: 16px;
 	}
 	.section-title {
 		margin-top: 6px;

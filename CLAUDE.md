@@ -108,5 +108,10 @@ English code, Conventional Commits).
   `/api/v1` authenticates by API KEY only (lib/server/api: `authenticate` → `ApiContext`, the
   key alone gives organization + application); the hook skips the session for it. Publishable
   keys read PUBLIC folders only; secret keys are refused when a browser sends them.
+  Writes (uploads, file alt / caption, delete) need a SECRET key and reuse the SAME core as the
+  console (`fileService.reserveUpload` / `confirmUpload` / `removeFile` / `setFileText`). A file
+  sent by a site (`StoredFile.source = API`) is read-only in the console: only the site deletes it.
+- **Never delete tenant data with raw SQL** in dev: it skips the storage purge and leaves orphan
+  objects in the buckets — delete through the console (or the services).
 - Record every validated decision in `DECISIONS.md` (date + decision + why) before or with the
   code that implements it.

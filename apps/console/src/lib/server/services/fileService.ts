@@ -38,30 +38,43 @@ export async function usage(ctx: OrgContext): Promise<StorageUsage> {
 	};
 }
 
-export async function requestUpload(
-	ctx: OrgContext,
-	applicationId: string,
-	input: { folderId: string; name: string; size: number; contentType: string }
-): Promise<UploadTicket> {
-	assertCan(ctx, 'files.write');
-	assertStorageEnabled(ctx);
+/** Where the reserved file goes and who sends it (console member or site API key). */
+export type UploadScope = {
+	organizationId: string;
+	applicationId: string;
+	quotaBytes: number;
+	folder: { id: string; visibility: Visibility };
+	uploadedById: string | null;
+	apiKeyId: string | null;
+};
+
+export type UploadInput = {
+	name: string;
+	size: number;
+	contentType: string;
+	alt?: string | null;
+	caption?: string | null;
+};
+
+/**
+ * Core of an upload ticket, shared by the console and the API (callers check rights first): type and
+ * size rules, then — under a lock on the organization — the QUOTA, and the declared size is reserved.
+ */
+export async function reserveUpload(scope: UploadScope, input: UploadInput): Promise<UploadTicket> {
 	const refusal = uploadRefusal({ type: input.contentType, size: input.size });
 	if (refusal) throw new HubError(refusal);
 	const kind = kindOf(input.contentType)!;
-	await applicationOrThrow(ctx, applicationId);
-	const folder = await folderOrThrow(ctx, applicationId, input.folderId);
-
-	const organizationId = ctx.organization.id;
+	const { organizationId, applicationId, quotaBytes } = scope;
 	const fileId = randomUUID();
 	const originalKey = originalKeyOf(organizationId, fileId);
 
 	await prisma.$transaction(async (tx) => {
 		await fileRepo.lockOrganization(tx, organizationId);
 		const used = await fileRepo.usedBytes(organizationId, tx);
-		// Strict block at the quota (§10): the member must free space or move to a higher plan.
-		if (used + BigInt(input.size) > BigInt(ctx.organization.quotaBytes)) {
+		// Strict block at the quota (§10): free space or move to a higher plan.
+		if (used + BigInt(input.size) > BigInt(quotaBytes)) {
 			throw new HubError(
-				`Espace de stockage insuffisant : ${formatBytes(Number(used))} utilisés sur ${formatBytes(ctx.organization.quotaBytes)}. ` +
+				`Espace de stockage insuffisant : ${formatBytes(Number(used))} utilisés sur ${formatBytes(quotaBytes)}. ` +
 					'Supprimez des fichiers ou passez à un forfait supérieur.'
 			);
 		}
@@ -69,19 +82,46 @@ export async function requestUpload(
 			id: fileId,
 			organizationId,
 			applicationId,
-			folderId: folder.id,
+			folderId: scope.folder.id,
 			name: input.name,
 			kind,
-			visibility: folder.visibility,
+			visibility: scope.folder.visibility,
 			storagePrefix: prefixOf(organizationId, applicationId, fileId),
 			originalKey,
 			bytes: BigInt(input.size),
-			uploadedById: ctx.userId
+			uploadedById: scope.uploadedById,
+			alt: input.alt || null,
+			caption: input.caption || null,
+			source: scope.apiKeyId ? 'API' : 'CONSOLE',
+			apiKeyId: scope.apiKeyId
 		});
 	});
 
 	const uploadUrl = await storage.presignUpload('PRIVATE', originalKey, input.contentType, input.size);
 	return { fileId, uploadUrl, contentType: input.contentType };
+}
+
+/** Console: a member uploads into a folder of the active organization. */
+export async function requestUpload(
+	ctx: OrgContext,
+	applicationId: string,
+	input: { folderId: string } & UploadInput
+): Promise<UploadTicket> {
+	assertCan(ctx, 'files.write');
+	assertStorageEnabled(ctx);
+	await applicationOrThrow(ctx, applicationId);
+	const folder = await folderOrThrow(ctx, applicationId, input.folderId);
+	return reserveUpload(
+		{
+			organizationId: ctx.organization.id,
+			applicationId,
+			quotaBytes: ctx.organization.quotaBytes,
+			folder,
+			uploadedById: ctx.userId,
+			apiKeyId: null
+		},
+		input
+	);
 }
 
 /** Build and store the processed versions of a received original. */
@@ -108,9 +148,15 @@ async function processOriginal(file: {
 	return { variants, width: large.width ?? null, height: large.height ?? null };
 }
 
+/** Console: confirm an upload of the active organization. */
 export async function completeUpload(ctx: OrgContext, applicationId: string, fileId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
-	const organizationId = ctx.organization.id;
+	await confirmUpload(ctx.organization.id, applicationId, fileId);
+}
+
+/** Core of a confirmation, shared by the console and the API (callers check rights first): check the
+ *  original was received, then process it (an image / PDF now, a video through the worker). */
+export async function confirmUpload(organizationId: string, applicationId: string, fileId: string): Promise<void> {
 	const file = await fileRepo.findFile(organizationId, fileId);
 	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
 	if (file.status !== 'UPLOADING' || !file.originalKey) throw new HubError('Ce fichier a déjà été traité.');
@@ -174,6 +220,9 @@ export async function listFiles(ctx: OrgContext, folderId: string): Promise<File
 				height: f.height,
 				error: f.error,
 				createdAt: f.createdAt,
+				source: f.source,
+				alt: f.alt,
+				caption: f.caption,
 				thumbUrl: await urlOf(f.visibility, thumb),
 				viewUrl: await urlOf(f.visibility, full),
 				publicUrl: f.visibility === 'PUBLIC' && full ? storage.publicUrl(full.key) : null
@@ -182,13 +231,49 @@ export async function listFiles(ctx: OrgContext, folderId: string): Promise<File
 	);
 }
 
-/** Delete a file: its objects first, then the row (its bytes are freed at once — §10). */
+/** Core of a deletion: the objects first, then the row (its bytes are freed at once — §10). */
+export async function removeFile(organizationId: string, applicationId: string, fileId: string): Promise<void> {
+	const file = await fileRepo.findFile(organizationId, fileId);
+	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	await purgeObjects([file]);
+	await fileRepo.deleteFile(organizationId, fileId);
+}
+
+/** Console: delete a file — except one a SITE uploaded, which only that site deletes (§22). */
 export async function deleteFile(ctx: OrgContext, applicationId: string, fileId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
 	const file = await fileRepo.findFile(ctx.organization.id, fileId);
 	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
-	await purgeObjects([file]);
-	await fileRepo.deleteFile(ctx.organization.id, fileId);
+	if (file.source === 'API') {
+		throw new HubError('Ce fichier a été envoyé par le site : il se supprime depuis le site uniquement.', { status: 403 });
+	}
+	await removeFile(ctx.organization.id, applicationId, fileId);
+}
+
+/** Core: set a file's alternative text and caption (empty = none; undefined = unchanged). */
+export async function setFileText(
+	organizationId: string,
+	applicationId: string,
+	fileId: string,
+	text: { alt?: string | null; caption?: string | null }
+): Promise<void> {
+	const file = await fileRepo.findFile(organizationId, fileId);
+	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	await fileRepo.updateFile(organizationId, fileId, {
+		...(text.alt !== undefined ? { alt: text.alt || null } : {}),
+		...(text.caption !== undefined ? { caption: text.caption || null } : {})
+	});
+}
+
+/** Console: edit a file's alt / caption (any origin — a site's files included, §22). */
+export async function updateFileText(
+	ctx: OrgContext,
+	applicationId: string,
+	fileId: string,
+	text: { alt?: string | null; caption?: string | null }
+): Promise<void> {
+	assertCan(ctx, 'files.write');
+	await setFileText(ctx.organization.id, applicationId, fileId, text);
 }
 
 // ─── Background work (called by the media worker: no session) ───────────────

@@ -10,7 +10,7 @@ type OrganizationRow = {
 };
 
 type OrganizationListRow = OrganizationRow & {
-	_count: { memberships: number; applications: number };
+	_count: { memberships: number; applications: number; files: number };
 	memberships: { role: OrgRole }[];
 };
 
@@ -24,6 +24,7 @@ export function toOrganizationListItem(row: OrganizationListRow): OrganizationLi
 		storageEnabled: row.storageEnabled,
 		memberCount: row._count.memberships,
 		applicationCount: row._count.applications,
+		siteFileCount: row._count.files,
 		myRole: row.memberships[0]?.role ?? null
 	};
 }

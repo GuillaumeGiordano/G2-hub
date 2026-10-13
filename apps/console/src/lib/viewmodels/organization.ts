@@ -9,6 +9,8 @@ export type OrganizationListItem = {
 	storageEnabled: boolean;
 	memberCount: number;
 	applicationCount: number;
+	/** Files its sites uploaded through the API — lost if the organization is deleted (§22). */
+	siteFileCount: number;
 	/** The current user's role in it (null for the superadmin when not a member). */
 	myRole: OrgRole | null;
 };

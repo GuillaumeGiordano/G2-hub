@@ -175,6 +175,7 @@
 	<div class="slug">
 		{fileKindLabel[file.kind]}{file.width ? ` · ${file.width} × ${file.height}` : ''}
 	</div>
+	{#if file.source === 'API'}<Badge label="Envoyé par le site" variant="primary" />{/if}
 	{#if file.error}<div class="file-error">{file.error}</div>{/if}
 {/snippet}
 
@@ -214,7 +215,7 @@
 						}}
 					/>
 				{/if}
-				{#if b.canWrite}
+				{#if b.canWrite && file.source !== 'API'}
 					<ButtonActionItem
 						label="Supprimer"
 						icon={Trash2}

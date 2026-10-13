@@ -17,3 +17,6 @@ Thumbs.db
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Demo site database (apps/demo-landing)
+apps/demo-landing/data

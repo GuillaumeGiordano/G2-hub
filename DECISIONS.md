@@ -146,7 +146,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 2c ✅ | Vidéos (ffmpeg, 1080p + poster), file de traitement en base, nettoyage des envois abandonnés |
 | 3a ✅ | Clés API (publique / secrète) + API de lecture `/api/v1` (dossiers, fichiers) + CORS + cache |
 | 3b ✅ | SDK `@g2/hub-client` + landing de démo avec sa galerie branchée |
-| 3c | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) |
+| 3c ✅ | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) + admin de démo |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
 
@@ -447,7 +447,69 @@ Sud », `HeroSection` + `GallerySection` de `@guillaumeg/ui`, galerie lue **côt
 clé publique (`.env` : `DEMO_HUB_URL`, `DEMO_HUB_KEY`, `DEMO_GALLERY_PATH`). Elle sert de modèle
 pour les vrais sites clients. Organisation de démonstration conservée dans la base locale.
 
-## 21. Questions ouvertes
+## 21. Médiathèque d'une application
+
+✅ **2026-10-13 — Un espace pour VOIR les médias** dans la console : un onglet **« Médiathèque »**
+par application (Fichiers | Médiathèque | Clés API), avec **tous les médias de l'application, tous
+dossiers confondus**. L'onglet Fichiers reste celui de la gestion (dossiers, envoi, suppression).
+
+💡 Mise en œuvre :
+- grille de vignettes (photo, poster de vidéo avec ▶, icône pour un PDF ; « Privé » signalé),
+  responsive ; visible par **tous les membres** ;
+- filtres **dans l'URL** : type, dossier (le dossier **et ses sous-dossiers**), nom ; 48 médias par page ;
+- **visionneuse plein écran** (`Modal` de la bibliothèque, taille `full`), ouverte par `?media=<id>` :
+  lien partageable, le bouton Retour la ferme ; image en grand, vidéo avec son lecteur, PDF intégré ;
+  précédent / suivant au clavier (← →) et au glissement sur mobile ;
+- panneau d'infos : dossier (lien), visibilité, type et dimensions, taille, date ; actions : copier
+  le lien public, **télécharger** (sous le nom d'origine avec l'extension stockée, `.webp` / `.mp4`),
+  ouvrir le dossier, supprimer (à partir d'`editor`, avec confirmation).
+
+⚠️ Le PDF s'affiche dans un cadre intégré : à revérifier en prod que le stockage Infomaniak
+n'interdit pas l'affichage dans une `iframe` (MinIO l'autorise).
+
+## 22. Un site qui alimente sa galerie (étape 3c)
+
+✅ **2026-10-13 — Parcours cible** : depuis l'admin de **son** site, le client ajoute une photo via un
+formulaire (photo + infos métier : titre, description, prix…). Le **serveur du site**, avec la **clé
+secrète**, demande un ticket au hub ; le **navigateur envoie la photo directement au stockage**
+(URL signée — la clé secrète ne quitte jamais le serveur) ; le serveur confirme, le hub traite et
+renvoie l'**identifiant du fichier** et ses URL ; le site enregistre dans **sa propre base** cet
+identifiant + ses infos métier. La photo apparaît sur le site **et** dans la Médiathèque de G2 Hub.
+
+✅ **2026-10-13 — Partage des rôles** : G2 Hub gère les **fichiers** (stockage, traitement, quota,
+médiathèque) ; la base du site gère les **informations métier** et garde l'identifiant G2 Hub
+comme lien.
+
+✅ **2026-10-13 — Texte alternatif et légende stockés aussi dans G2 Hub**, par fichier : modifiables dans
+la Médiathèque, renseignables à l'envoi par l'API, renvoyés par l'API. Un site 100 % front (sans
+base) peut ainsi afficher une galerie légendée. (Assouplit « uniquement des fichiers » du §2 : deux
+champs descriptifs, pas de contenu métier.)
+
+✅ **2026-10-13 — Un fichier envoyé par un site (via l'API) ne se supprime pas dans G2 Hub** : la
+Médiathèque le montre en lecture seule (sa légende reste modifiable) ; il ne se supprime que depuis
+le site, par l'API. Ainsi la base du site ne pointe jamais vers un fichier disparu.
+
+💡 Conséquences à implémenter :
+- chaque fichier retient son **origine** (`console` ou `api` + la clé utilisée) ;
+- un dossier qui contient des fichiers envoyés par un site **ne peut pas être supprimé** depuis la
+  console (message : quels fichiers / quel site) ;
+- supprimer une **application** ou une **organisation** reste possible (cas exceptionnel, qui coupe de
+  toute façon l'intégration du site), avec un avertissement indiquant le nombre de fichiers concernés ;
+- API d'écriture (clé secrète) : créer un ticket d'envoi, confirmer, lire un fichier par son id,
+  modifier alt / légende, supprimer ; le SDK reçoit les méthodes correspondantes (côté serveur).
+
+✅ **Réalisé (étape 3c)** — endpoints, tous en clé **secrète** sauf la lecture :
+- `POST /api/v1/uploads` `{ path | folder, name, size, contentType, alt?, caption? }` → ticket
+  (`fileId`, `uploadUrl` à appeler en `PUT`, valable 15 min) ;
+- `POST /api/v1/uploads/:id/complete` → le fichier (`READY` ; `PROCESSING` pour une vidéo) ;
+- `GET /api/v1/files/:id` (clé publique : fichier public et prêt seulement) ;
+- `PATCH /api/v1/files/:id` `{ alt?, caption? }` (`null` efface) ; `DELETE /api/v1/files/:id`.
+SDK : `createUpload`, `completeUpload`, `uploadFile` (tout-en-un côté serveur), `file`, `updateFile`,
+`deleteFile`. Le cœur de l'envoi (quota, réservation, traitement) est **le même** que pour la
+console. Admin de démo (`/admin` de la landing, mot de passe `DEMO_ADMIN_PASSWORD`) : base du site
+simulée par `apps/demo-landing/data/creations.json`.
+
+## 23. Questions ouvertes
 
 ❓ **Distribution du SDK** aux sites clients (dépôts séparés) : registre npm privé, paquet GitHub,
 ou installation depuis le dépôt git (comme `@guillaumeg/ui`) ?

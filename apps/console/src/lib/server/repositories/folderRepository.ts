@@ -11,6 +11,14 @@ export function findFolder(organizationId: string, id: string) {
 	});
 }
 
+/** Every folder of an application (to build the folder filter with full paths). */
+export function listAllFolders(organizationId: string, applicationId: string) {
+	return prisma.folder.findMany({
+		where: { organizationId, applicationId },
+		select: { id: true, name: true, parentId: true }
+	});
+}
+
 /** Direct children of `parentId` (null = the application's root folders). */
 export function listChildren(organizationId: string, applicationId: string, parentId: string | null) {
 	return prisma.folder.findMany({

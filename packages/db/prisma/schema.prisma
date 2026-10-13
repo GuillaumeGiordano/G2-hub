@@ -107,6 +107,14 @@ model Folder {
   @@index([organizationId, applicationId, parentId])
 }
 
+/// Where a file was uploaded from (DECISIONS.md §22). A file sent by a client SITE (through the API)
+/// is only deleted from that site: the console shows it read-only, so the site's database never
+/// points to a vanished file.
+enum FileSource {
+  CONSOLE
+  API
+}
+
 enum FileKind {
   IMAGE
   VIDEO
@@ -135,6 +143,14 @@ model StoredFile {
   folder         Folder       @relation(fields: [folderId], references: [id], onDelete: Cascade)
   /// Display name (the uploaded file's name).
   name           String
+  /// Alternative text for an image (accessibility, SEO) — editable in the media library (§22).
+  alt            String?
+  /// Caption shown under the media on a site — editable in the media library (§22).
+  caption        String?
+  source         FileSource   @default(CONSOLE)
+  /// The API key a site uploaded it with (null when uploaded from the console).
+  apiKeyId       String?
+  apiKey         ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   kind           FileKind
   status         FileStatus   @default(UPLOADING)
   /// The bucket the processed versions live in — copied from the folder at upload (§7).
@@ -195,6 +211,9 @@ model ApiKey {
   createdById    String?
   createdBy      User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
+
+  /// Files a site uploaded with this key.
+  files StoredFile[]
 
   @@index([organizationId, applicationId])
 }

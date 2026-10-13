@@ -127,6 +127,14 @@ export async function deleteFolder(ctx: OrgContext, applicationId: string, folde
 	assertStorageEnabled(ctx);
 	const folder = await folderOrThrow(ctx, applicationId, folderId);
 	const folderIds = await folderRepo.listSubtreeIds(ctx.organization.id, folder.id);
+	const siteFiles = await fileRepo.countSiteFilesInFolders(ctx.organization.id, folderIds);
+	if (siteFiles) {
+		throw new HubError(
+			`Ce dossier contient ${siteFiles} fichier${siteFiles > 1 ? 's' : ''} envoyé${siteFiles > 1 ? 's' : ''} par le site : ` +
+				'ils se suppriment depuis le site uniquement.',
+			{ status: 403 }
+		);
+	}
 	await purgeObjects(await fileRepo.listFilesInFolders(ctx.organization.id, folderIds));
 	await folderRepo.deleteFolder(ctx.organization.id, folder.id);
 }

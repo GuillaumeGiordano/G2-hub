@@ -12,6 +12,10 @@ export type FileListItem = {
 	height: number | null;
 	error: string | null;
 	createdAt: Date;
+	/** CONSOLE, or API = uploaded by the client site: deleted from the site only (§22). */
+	source: 'CONSOLE' | 'API';
+	alt: string | null;
+	caption: string | null;
 	/** Thumbnail to show in the list (public URL, or a short-lived signed link for a private file). */
 	thumbUrl: string | null;
 	/** Full version to open (largest image, the PDF…). */

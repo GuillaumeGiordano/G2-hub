@@ -8,6 +8,9 @@ import { prisma } from '$lib/server/db';
 const fileSelect = {
 	id: true,
 	name: true,
+	alt: true,
+	caption: true,
+	source: true,
 	kind: true,
 	status: true,
 	visibility: true,
@@ -33,6 +36,70 @@ export function listFilesInFolder(organizationId: string, folderId: string) {
 		orderBy: { createdAt: 'desc' },
 		select: fileSelect
 	});
+}
+
+/** The media library of an application: READY files, newest first, optionally filtered by kind,
+ *  folders (a folder and its subtree) and name. */
+function mediaWhere(
+	organizationId: string,
+	applicationId: string,
+	filter: { kind?: FileKind; folderIds?: string[]; search?: string }
+): Prisma.StoredFileWhereInput {
+	return {
+		organizationId,
+		applicationId,
+		status: 'READY',
+		...(filter.kind ? { kind: filter.kind } : {}),
+		...(filter.folderIds ? { folderId: { in: filter.folderIds } } : {}),
+		...(filter.search ? { name: { contains: filter.search, mode: 'insensitive' } } : {})
+	};
+}
+
+export function searchMedia(
+	organizationId: string,
+	applicationId: string,
+	filter: { kind?: FileKind; folderIds?: string[]; search?: string },
+	page: { skip: number; take: number }
+) {
+	return prisma.storedFile.findMany({
+		where: mediaWhere(organizationId, applicationId, filter),
+		orderBy: { createdAt: 'desc' },
+		skip: page.skip,
+		take: page.take,
+		select: { ...fileSelect, folder: { select: { name: true } } }
+	});
+}
+
+/** One READY file of the application's library, or null. */
+export function findMediaById(organizationId: string, applicationId: string, id: string) {
+	return prisma.storedFile.findFirst({
+		where: { id, organizationId, applicationId, status: 'READY' },
+		select: { ...fileSelect, folder: { select: { name: true } } }
+	});
+}
+
+export function countMedia(
+	organizationId: string,
+	applicationId: string,
+	filter: { kind?: FileKind; folderIds?: string[]; search?: string }
+) {
+	return prisma.storedFile.count({ where: mediaWhere(organizationId, applicationId, filter) });
+}
+
+/** Files a SITE uploaded, per application of the organization (deletion warnings, §22). */
+export async function countSiteFilesByApplication(organizationId: string): Promise<Map<string, number>> {
+	const rows = await prisma.storedFile.groupBy({
+		by: ['applicationId'],
+		where: { organizationId, source: 'API' },
+		_count: { _all: true }
+	});
+	return new Map(rows.map((r) => [r.applicationId, r._count._all]));
+}
+
+/** How many files a SITE uploaded (through the API) under these folders — they cannot be deleted
+ *  from the console (§22). */
+export function countSiteFilesInFolders(organizationId: string, folderIds: string[]) {
+	return prisma.storedFile.count({ where: { organizationId, folderId: { in: folderIds }, source: 'API' } });
 }
 
 /** Every file under these folders (to purge their objects before deleting a folder tree). */
@@ -79,7 +146,11 @@ export function createUploadingFile(
 		storagePrefix: string;
 		originalKey: string;
 		bytes: bigint;
-		uploadedById: string;
+		uploadedById: string | null;
+		alt: string | null;
+		caption: string | null;
+		source: 'CONSOLE' | 'API';
+		apiKeyId: string | null;
 	}
 ) {
 	return tx.storedFile.create({ data, select: { id: true } });

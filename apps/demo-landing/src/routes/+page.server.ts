@@ -3,7 +3,7 @@ import { galleryPath, hub } from '$lib/server/hub';
 import type { PageServerLoad } from './$types';
 
 /** A gallery image as the page shows it. */
-export type GalleryImage = { src: string; alt: string };
+export type GalleryImage = { src: string; alt: string; caption?: string };
 
 /** "croissant-beurre.jpg" → "croissant beurre". */
 const altOf = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
@@ -20,7 +20,9 @@ export const load: PageServerLoad = async () => {
 			.map((f) => ({
 				// The 1200 px version: sharp enough for the grid and the lightbox, light enough to load.
 				src: f.versions.medium?.url ?? f.url,
-				alt: altOf(f.name)
+				// Alt text and caption come from G2 Hub (set by the site's admin or in the media library).
+				alt: f.alt ?? altOf(f.name),
+				...(f.caption ? { caption: f.caption } : {})
 			}));
 		return { images, error: null };
 	} catch (err) {

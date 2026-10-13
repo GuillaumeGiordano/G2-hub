@@ -8,6 +8,12 @@
 // and only reads PUBLIC folders. A secret key (`g2_sec_…`) is server-only: it is sent in the
 // Authorization header, and this client refuses to be created with one in a browser.
 // Works with any fetch implementation (browsers, Node 18+, SvelteKit's `fetch`).
+//
+// With a SECRET key, a site's server also writes (DECISIONS.md §22):
+//   const ticket = await hub.createUpload({ path: 'Galerie', name, size, contentType });
+//   → the visitor's browser PUTs the file to `ticket.uploadUrl` (Content-Type = contentType)
+//   const file = await hub.completeUpload(ticket.fileId);   // store file.id in the site's database
+// or, when the file is already on the server: `await hub.uploadFile({ path, name, contentType, data })`.
 
 export type HubVisibility = 'PUBLIC' | 'PRIVATE';
 export type HubFileKind = 'IMAGE' | 'VIDEO' | 'PDF';
@@ -22,10 +28,17 @@ export type HubVersion = {
 	height: number | null;
 };
 
+export type HubFileStatus = 'UPLOADING' | 'PROCESSING' | 'READY' | 'FAILED';
+
 export type HubFile = {
 	id: string;
 	name: string;
 	kind: HubFileKind;
+	/** Listings only hold READY files; after an upload a video is PROCESSING for a while. */
+	status: HubFileStatus;
+	/** Alternative text and caption (editable in the hub's media library too). */
+	alt: string | null;
+	caption: string | null;
 	width: number | null;
 	height: number | null;
 	bytes: number;
@@ -37,6 +50,31 @@ export type HubFile = {
 	thumbnailUrl: string | null;
 	/** thumb / medium / large (image), video / poster (video), document (PDF). */
 	versions: Record<string, HubVersion>;
+	/** Why processing failed (FAILED only). */
+	error: string | null;
+};
+
+/** Where to upload: a folder `path` ("Galerie/2026") or its `folder` id. */
+export type HubUploadTarget = { path: string; folder?: never } | { folder: string; path?: never };
+
+export type HubUploadRequest = HubUploadTarget & {
+	/** The file's name (shown in the hub's media library). */
+	name: string;
+	/** Exact size in bytes — the signed URL only accepts this size. */
+	size: number;
+	/** MIME type: image/jpeg, image/png, image/webp, image/gif, image/avif, video/mp4,
+	 *  video/quicktime, video/webm, application/pdf. */
+	contentType: string;
+	alt?: string | null;
+	caption?: string | null;
+};
+
+export type HubUploadTicket = {
+	fileId: string;
+	/** PUT the file's bytes here, with header Content-Type = `contentType`. */
+	uploadUrl: string;
+	contentType: string;
+	expiresInSeconds: number;
 };
 
 export type HubFolderListing = { folder: HubFolder | null; folders: HubFolder[] };
@@ -72,6 +110,20 @@ export type HubClient = {
 	folders(path?: string): Promise<HubFolderListing>;
 	/** Files of the folder at `path` ("Galerie/2026"), newest first. */
 	files(path: string): Promise<HubFileListing>;
+	/** One file by id (a publishable key only sees a READY file of a public folder). */
+	file(id: string): Promise<HubFile>;
+
+	// ── Secret key (server side) ──
+	/** Reserve an upload (type, size, quota checked) and get the signed URL to PUT the file to. */
+	createUpload(request: HubUploadRequest): Promise<HubUploadTicket>;
+	/** The file was PUT: process it. Image / PDF → READY; video → PROCESSING (poll `file(id)`). */
+	completeUpload(fileId: string): Promise<HubFile>;
+	/** Ticket + PUT + completion in one go, for a file already on the server. */
+	uploadFile(request: Omit<HubUploadRequest, 'size'> & { data: Blob | ArrayBuffer | Uint8Array }): Promise<HubFile>;
+	/** Set alt and / or caption (null clears; absent = unchanged). */
+	updateFile(id: string, text: { alt?: string | null; caption?: string | null }): Promise<HubFile>;
+	/** Delete a file (and free its space). */
+	deleteFile(id: string): Promise<void>;
 };
 
 const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -86,7 +138,7 @@ export function createHubClient(options: HubClientOptions): HubClient {
 	/** Last good answer per request, served when the hub is unreachable. */
 	const lastGood = new Map<string, unknown>();
 
-	async function get<T>(endpoint: string, params: Record<string, string | undefined>): Promise<T> {
+	async function get<T>(endpoint: string, params: Record<string, string | undefined> = {}): Promise<T> {
 		const url = new URL(`/api/v1/${endpoint}`, baseUrl);
 		for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v);
 		const cacheKey = url.toString(); // without the key
@@ -109,10 +161,47 @@ export function createHubClient(options: HubClientOptions): HubClient {
 		return body as T;
 	}
 
-	return {
+	/** A write (secret key only): no stale fallback — a write must really happen or fail. */
+	async function send<T>(method: 'POST' | 'PATCH' | 'DELETE', endpoint: string, body?: unknown): Promise<T> {
+		if (!secret) throw new HubError(403, 'Opération réservée à une clé secrète (côté serveur).');
+		let res: Response;
+		try {
+			res = await fetchImpl(new URL(`/api/v1/${endpoint}`, baseUrl), {
+				method,
+				headers: { authorization: `Bearer ${key}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+				body: body ? JSON.stringify(body) : undefined
+			});
+		} catch {
+			throw new HubError(0, 'Hub injoignable.');
+		}
+		const data = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+		if (!res.ok) throw new HubError(res.status, data?.error?.message ?? res.statusText);
+		return data as T;
+	}
+
+	const client: HubClient = {
 		folders: (path) => get<HubFolderListing>('folders', { path }),
-		files: (path) => get<HubFileListing>('files', { path })
+		files: (path) => get<HubFileListing>('files', { path }),
+		file: (id) => get<HubFile>(`files/${encodeURIComponent(id)}`),
+		createUpload: (request) => send<HubUploadTicket>('POST', 'uploads', request),
+		completeUpload: (fileId) => send<HubFile>('POST', `uploads/${encodeURIComponent(fileId)}/complete`),
+		async uploadFile({ data, ...request }) {
+			const bytes = data instanceof Blob ? data : new Blob([data as BlobPart]);
+			const ticket = await client.createUpload({ ...request, size: bytes.size } as HubUploadRequest);
+			const put = await fetchImpl(ticket.uploadUrl, {
+				method: 'PUT',
+				headers: { 'content-type': ticket.contentType },
+				body: bytes
+			});
+			if (!put.ok) throw new HubError(put.status, `Envoi refusé par le stockage (${put.status}).`);
+			return client.completeUpload(ticket.fileId);
+		},
+		updateFile: (id, text) => send<HubFile>('PATCH', `files/${encodeURIComponent(id)}`, text),
+		deleteFile: async (id) => {
+			await send<{ deleted: true }>('DELETE', `files/${encodeURIComponent(id)}`);
+		}
 	};
+	return client;
 }
 
 /** `srcset` of an image file from its widths ("…/thumb.webp 400w, …/medium.webp 1200w, …"), so the

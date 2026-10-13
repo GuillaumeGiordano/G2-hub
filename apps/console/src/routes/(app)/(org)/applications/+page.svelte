@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import {
+		Alert,
 		Badge,
 		Button,
 		ButtonAction,
@@ -196,6 +197,15 @@
 		Supprimer <strong>{toDelete?.name}</strong> ? Le site ou portail qui l'utilise ne pourra plus
 		appeler le hub. Cette action est <strong>irréversible</strong>.
 	</p>
+	{#if toDelete?.siteFileCount}
+		<div class="warning">
+			<Alert variant="warning" title="Fichiers envoyés par le site">
+				{toDelete.siteFileCount} fichier{toDelete.siteFileCount > 1 ? 's' : ''} envoyé{toDelete.siteFileCount > 1 ? 's' : ''}
+				par le site {toDelete.siteFileCount > 1 ? 'seront supprimés' : 'sera supprimé'} : le site ne pourra plus
+				{toDelete.siteFileCount > 1 ? 'les afficher' : 'l’afficher'}.
+			</Alert>
+		</div>
+	{/if}
 	<form
 		method="POST"
 		action="?/delete"
@@ -224,6 +234,9 @@
 		font-size: 12px;
 		color: var(--text-subtle);
 		font-family: var(--font-mono, monospace);
+	}
+	.warning {
+		margin-bottom: 16px;
 	}
 	.origins {
 		display: flex;
