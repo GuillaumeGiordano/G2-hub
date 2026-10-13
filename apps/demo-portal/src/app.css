@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+@import '@guillaumeg/ui/styles/tokens.css'; /* base tokens + blue theme by default */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+	background: var(--bg-base);
+	color: var(--text-base);
+	min-height: 100dvh;
+}

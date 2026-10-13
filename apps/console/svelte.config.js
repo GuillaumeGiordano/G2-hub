@@ -10,7 +10,11 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		// The .env lives at the workspace root (SvelteKit reads $env/* from kit.env.dir).
-		env: { dir: '../../' }
+		env: { dir: '../../' },
+		// The cross-site form check is done in hooks.server.ts instead (same rule, in dev too), so
+		// that the OIDC token endpoint — called server-to-server by portals, with no Origin header —
+		// can be exempted. Do NOT remove that check from the hook.
+		csrf: { trustedOrigins: ['*'] }
 	}
 };
 

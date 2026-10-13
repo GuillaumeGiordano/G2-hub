@@ -34,6 +34,7 @@
 		"@guillaumeg/ui": "github:GuillaumeGiordano/my-components",
 		"@lucide/svelte": "^1.22.0",
 		"better-auth": "^1.6.23",
+		"jose": "^6.2.12",
 		"nodemailer": "^10.1.0",
 		"qrcode": "^1.5.4",
 		"sharp": "^0.35.5",

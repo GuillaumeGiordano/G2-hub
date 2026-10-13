@@ -1,0 +1,127 @@
+import type { Prisma } from '@g2-hub/db';
+import { prisma } from '$lib/server/db';
+
+// « Se connecter avec G2 Hub » (OIDC) — Prisma queries only. The console queries are scoped by
+// organization (§13); the protocol endpoints start from what the portal sends (client_id = the
+// application id, a code or a token hash) and are then bound to THAT application.
+
+// ─── Console: SSO settings of an application ─────────────────────────────────
+
+export function findSsoSettings(organizationId: string, applicationId: string) {
+	return prisma.application.findFirst({
+		where: { id: applicationId, organizationId },
+		select: { id: true, name: true, ssoSecretHash: true, ssoSecretPrefix: true, ssoRedirectUris: true }
+	});
+}
+
+/** Returns the number of rows changed (0 = not in this organization). */
+export async function updateSsoSettings(
+	organizationId: string,
+	applicationId: string,
+	data: { ssoSecretHash?: string | null; ssoSecretPrefix?: string | null; ssoRedirectUris?: string[] }
+) {
+	const { count } = await prisma.application.updateMany({ where: { id: applicationId, organizationId }, data });
+	return count;
+}
+
+/** Sign-in is turned off: codes and tokens already issued stop working. */
+export async function revokeApplicationGrants(applicationId: string) {
+	await prisma.$transaction([
+		prisma.oidcAuthCode.deleteMany({ where: { applicationId } }),
+		prisma.oidcAccessToken.deleteMany({ where: { applicationId } })
+	]);
+}
+
+// ─── Protocol ────────────────────────────────────────────────────────────────
+
+/** An application with sign-in enabled (`client_id`), or null. */
+export function findSsoClient(applicationId: string) {
+	return prisma.application.findFirst({
+		where: { id: applicationId, ssoSecretHash: { not: null } },
+		select: { id: true, name: true, ssoSecretHash: true, ssoRedirectUris: true }
+	});
+}
+
+export function createAuthCode(data: {
+	hash: string;
+	applicationId: string;
+	appUserId: string;
+	redirectUri: string;
+	codeChallenge: string;
+	nonce: string | null;
+	scope: string;
+	authTime: Date;
+	expiresAt: Date;
+}) {
+	return prisma.oidcAuthCode.create({ data, select: { id: true } });
+}
+
+export function findAuthCode(hash: string) {
+	return prisma.oidcAuthCode.findUnique({
+		where: { hash },
+		select: {
+			id: true,
+			applicationId: true,
+			redirectUri: true,
+			codeChallenge: true,
+			nonce: true,
+			scope: true,
+			authTime: true,
+			expiresAt: true,
+			usedAt: true,
+			appUser: { select: { id: true, email: true, name: true, passwordHash: true, disabledAt: true } }
+		}
+	});
+}
+
+/** Mark a code used only if it still is unused: a replayed code loses the race. */
+export async function useAuthCode(id: string): Promise<boolean> {
+	const { count } = await prisma.oidcAuthCode.updateMany({ where: { id, usedAt: null }, data: { usedAt: new Date() } });
+	return count === 1;
+}
+
+export function createAccessToken(data: {
+	hash: string;
+	applicationId: string;
+	appUserId: string;
+	scope: string;
+	expiresAt: Date;
+}) {
+	return prisma.oidcAccessToken.create({ data, select: { id: true } });
+}
+
+export function findAccessToken(hash: string) {
+	return prisma.oidcAccessToken.findUnique({
+		where: { hash },
+		select: {
+			applicationId: true,
+			scope: true,
+			expiresAt: true,
+			appUser: { select: { id: true, email: true, name: true, disabledAt: true } }
+		}
+	});
+}
+
+export function touchLastLogin(appUserId: string) {
+	return prisma.appUser.update({ where: { id: appUserId }, data: { lastLoginAt: new Date() }, select: { id: true } });
+}
+
+/** Expired codes and tokens are useless: removed periodically by the worker. */
+export async function purgeExpired(now = new Date()): Promise<number> {
+	const [codes, tokens] = await prisma.$transaction([
+		prisma.oidcAuthCode.deleteMany({ where: { expiresAt: { lt: now } } }),
+		prisma.oidcAccessToken.deleteMany({ where: { expiresAt: { lt: now } } })
+	]);
+	return codes.count + tokens.count;
+}
+
+// ─── Signing key ─────────────────────────────────────────────────────────────
+
+export function findSigningKeys() {
+	return prisma.oidcSigningKey.findMany({ orderBy: { createdAt: 'asc' } });
+}
+
+/** Insert unless a key with this id exists (two processes generating at once keep one). */
+export function insertSigningKey(data: { kid: string; publicJwk: Prisma.InputJsonValue; privateKeyPem: string }) {
+	return prisma.oidcSigningKey.createMany({ data: [data], skipDuplicates: true });
+}

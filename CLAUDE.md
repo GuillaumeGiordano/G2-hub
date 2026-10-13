@@ -38,6 +38,8 @@ pnpm db:up          # Postgres (:5433) + MinIO (API :9100, console :9101) + Mail
 pnpm db:deploy      # apply the migrations
 pnpm hub:install    # create the first superadmin (ADMIN_* from .env) — once per instance
 pnpm dev            # console on http://localhost:5180
+pnpm dev:demo       # demo landing on http://localhost:5190
+pnpm dev:portal     # demo portal on http://localhost:5191 (sign-in with G2 Hub)
 pnpm check          # type-check every package
 pnpm db:studio      # browse the database
 pnpm db:down        # stop the Docker services
@@ -76,6 +78,8 @@ packages/sdk/       @g2/hub-client — the client sites' SDK (no dependency, bro
                     compiled to dist/ (`pnpm --filter @g2/hub-client build`, also on install).
 apps/demo-landing/  Demo client site (port 5190, `pnpm dev:demo`): gallery read server-side with a
                     publishable key (DEMO_HUB_* in .env) — the template for real client sites.
+apps/demo-portal/   Demo client PORTAL (port 5191, `pnpm dev:portal`): « Se connecter avec G2 Hub »
+                    with openid-client (DEMO_PORTAL_* in .env) — the template for real portals.
 docker-compose.yml  Postgres 17 + MinIO with the two buckets (g2hub-public anonymous-read,
                     g2hub-private never public) + Mailpit (catches every e-mail in dev).
 ```
@@ -118,6 +122,14 @@ English code, Conventional Commits).
   They are invited (console tab « Utilisateurs », or `POST /api/v1/users` with a secret key) and
   choose their password from an e-mailed single-use link (`/mot-de-passe/[token]`, only the token's
   SHA-256 stored); `/mot-de-passe-oublie?app=` never reveals whether an address has an account.
+- **« Se connecter avec G2 Hub »** (DECISIONS.md §25): an OpenID Connect provider limited to
+  Authorization Code + PKCE S256 for confidential clients (`oidcService`; endpoints
+  `/.well-known/openid-configuration`, `/oauth/{authorize,token,userinfo,jwks}`). client_id = the
+  application id; return URLs compared EXACTLY; an unknown client / unregistered return URL is shown
+  on the hub, never redirected to. Codes, access tokens and client secrets are stored hashed.
+- **CSRF is checked in `hooks.server.ts`**, not by SvelteKit (`csrf.trustedOrigins: ['*']` in
+  svelte.config.js), so that `/oauth/token` (server-to-server, no Origin) can be exempted. Never
+  remove the hook's check; never exempt a route that uses the session cookie.
 - **E-mails** go through `lib/server/mail` (SMTP from .env: Mailpit in dev, Infomaniak in prod).
   Every value inserted in an e-mail's HTML is escaped (application names are typed by clients).
 - **Never delete tenant data with raw SQL** in dev: it skips the storage purge and leaves orphan

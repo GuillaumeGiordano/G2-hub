@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "pnpm --filter console dev",
 		"dev:demo": "pnpm --filter demo-landing dev",
+		"dev:portal": "pnpm --filter demo-portal dev",
 		"build": "pnpm -r build",
 		"check": "pnpm -r check",
 		"db:up": "docker compose up -d",

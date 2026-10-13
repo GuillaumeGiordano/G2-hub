@@ -24,7 +24,27 @@ const ORGANIZATIONS_PATH = '/organisations';
 /** The public API authenticates by API key (lib/server/api), never by session cookie. */
 const PUBLIC_API = '/api/v1/';
 
+/** Called server-to-server by portals (no Origin), authenticated by the client secret — never by a
+ *  cookie, so a cross-site form cannot abuse it. */
+const CSRF_EXEMPT = new Set(['/oauth/token']);
+const FORM_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
+
+/**
+ * CSRF protection (SvelteKit's own check, moved here — see svelte.config.js): a form posted from
+ * ANOTHER site would carry the visitor's session cookie; refuse any form submission whose Origin is
+ * not this site.
+ */
+function crossSiteForm(request: Request, url: URL): boolean {
+	if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return false;
+	const type = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() ?? '';
+	if (!FORM_TYPES.includes(type)) return false;
+	return request.headers.get('origin') !== url.origin && !CSRF_EXEMPT.has(url.pathname);
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	if (crossSiteForm(event.request, event.url)) {
+		return new Response(`Cross-site ${event.request.method} form submissions are forbidden`, { status: 403 });
+	}
 	if (event.url.pathname.startsWith(PUBLIC_API)) {
 		event.locals.user = null;
 		event.locals.session = null;

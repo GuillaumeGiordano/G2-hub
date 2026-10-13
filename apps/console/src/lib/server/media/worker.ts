@@ -1,5 +1,6 @@
 import * as jobRepo from '$lib/server/repositories/mediaJobRepository';
 import { cleanupAbandonedUploads, failVideo, processQueuedVideo } from '$lib/server/services/fileService';
+import { purgeExpiredGrants } from '$lib/server/services/oidcService';
 import { setWaker } from './signal';
 
 // Single in-process worker draining the media queue, one job at a time (DECISIONS.md §5) —
@@ -42,6 +43,8 @@ async function loop(): Promise<void> {
 				return 0;
 			});
 			if (removed) console.log(`[media] removed ${removed} abandoned upload(s)`);
+			// Same housekeeping tick: expired sign-in codes and access tokens (§25).
+			await purgeExpiredGrants().catch((err) => console.error('[oidc] purge failed:', err));
 		}
 
 		let job: jobRepo.ClaimedJob | null = null;

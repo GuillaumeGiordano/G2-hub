@@ -92,6 +92,14 @@ export async function setDisabled(organizationId: string, applicationId: string,
 	return count;
 }
 
+/** A disabled user's sign-in codes and access tokens stop working at once. */
+export async function revokeGrants(appUserId: string) {
+	await prisma.$transaction([
+		prisma.oidcAuthCode.deleteMany({ where: { appUserId } }),
+		prisma.oidcAccessToken.deleteMany({ where: { appUserId } })
+	]);
+}
+
 /** Returns the number of rows removed (0 = not in this organization / application). */
 export async function deleteAppUser(organizationId: string, applicationId: string, id: string) {
 	const { count } = await prisma.appUser.deleteMany({ where: { id, organizationId, applicationId } });

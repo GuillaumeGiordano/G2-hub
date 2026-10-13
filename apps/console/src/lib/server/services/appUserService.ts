@@ -158,7 +158,7 @@ export async function resendInvitation(ctx: OrgContext, applicationId: string, i
 	return user.email;
 }
 
-/** Disable (sign-in and links refused, the account and its files are kept) or re-enable. */
+/** Disable (sign-in, links and access tokens refused; the account and its files are kept) or re-enable. */
 export async function setAppUserDisabled(
 	ctx: OrgContext,
 	applicationId: string,
@@ -169,7 +169,10 @@ export async function setAppUserDisabled(
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	await userRepo.setDisabled(ctx.organization.id, applicationId, user.id, disabled ? new Date() : null);
-	if (disabled) await userRepo.revokeTokens(user.id);
+	if (disabled) {
+		await userRepo.revokeTokens(user.id);
+		await userRepo.revokeGrants(user.id);
+	}
 	return user.email;
 }
 

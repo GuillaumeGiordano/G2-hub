@@ -68,12 +68,21 @@ model Application {
   slug           String
   /// Origins (scheme + host + port) allowed to call the API from a browser — CORS (§3).
   allowedOrigins String[]     @default([])
+  /// « Se connecter avec G2 Hub » (OIDC, DECISIONS.md §25): on when a client secret exists. The
+  /// client_id is the application id; only the SHA-256 of the secret is stored.
+  ssoSecretHash   String?
+  /// First characters of the client secret, to recognize it ("g2_sso_8fK2…").
+  ssoSecretPrefix String?
+  /// Exact URLs the hub may send a user back to after sign-in (no wildcard).
+  ssoRedirectUris String[]    @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  folders  Folder[]
-  apiKeys  ApiKey[]
-  appUsers AppUser[]
+  folders      Folder[]
+  apiKeys      ApiKey[]
+  appUsers     AppUser[]
+  authCodes    OidcAuthCode[]
+  accessTokens OidcAccessToken[]
 
   @@unique([organizationId, slug])
 }
@@ -364,7 +373,9 @@ model AppUser {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  tokens AppUserToken[]
+  tokens       AppUserToken[]
+  authCodes    OidcAuthCode[]
+  accessTokens OidcAccessToken[]
 
   @@unique([applicationId, email])
   @@index([organizationId, applicationId])
@@ -389,4 +400,57 @@ model AppUserToken {
   createdAt DateTime            @default(now())
 
   @@index([appUserId, purpose])
+}
+
+// ─── « Se connecter avec G2 Hub » (OIDC provider) — DECISIONS.md §25 ─────────────────────────
+
+/// A single-use authorization code (60 s), exchanged by the portal's server for tokens. PKCE: the
+/// code is useless without the verifier matching `codeChallenge`. Only its SHA-256 is stored.
+model OidcAuthCode {
+  id            String      @id @default(uuid())
+  hash          String      @unique
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  appUserId     String
+  appUser       AppUser     @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  /// Must be sent again, identical, with the code.
+  redirectUri   String
+  /// base64url(SHA-256(code_verifier)) — S256 only.
+  codeChallenge String
+  nonce         String?
+  scope         String
+  /// When the user typed their password (`auth_time` claim).
+  authTime      DateTime
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([expiresAt])
+}
+
+/// An access token (opaque, 1 h) for /oauth/userinfo — and, later, the API on the user's behalf.
+/// Stored hashed, so disabling or deleting the user revokes it at once.
+model OidcAccessToken {
+  id            String      @id @default(uuid())
+  hash          String      @unique
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  appUserId     String
+  appUser       AppUser     @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  scope         String
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@index([appUserId])
+  @@index([expiresAt])
+}
+
+/// The instance's key pair signing the ID tokens (RS256), generated at first use. Portals verify
+/// signatures with the public half, published at /oauth/jwks.
+model OidcSigningKey {
+  /// Key id (`kid` in the token header) — lets a future key rotation publish several keys.
+  kid           String   @id
+  publicJwk     Json
+  privateKeyPem String
+  createdAt     DateTime @default(now())
 }

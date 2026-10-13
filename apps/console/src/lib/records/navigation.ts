@@ -49,14 +49,19 @@ export const NAV: NavSection[] = [
 ];
 
 /** Tabs of one application's pages (« Médiathèque » and « Utilisateurs » for every member; « Clés
- *  API » only for those who manage applications). */
+ *  API » and « Connexion » only for those who manage applications). */
 export function applicationTabs(applicationId: string, canManage: boolean) {
 	const base = `/applications/${applicationId}`;
 	return [
 		{ label: 'Fichiers', href: base },
 		{ label: 'Médiathèque', href: `${base}/mediatheque` },
 		{ label: 'Utilisateurs', href: `${base}/utilisateurs` },
-		...(canManage ? [{ label: 'Clés API', href: `${base}/cles` }] : [])
+		...(canManage
+			? [
+					{ label: 'Clés API', href: `${base}/cles` },
+					{ label: 'Connexion', href: `${base}/connexion` }
+				]
+			: [])
 	];
 }
 

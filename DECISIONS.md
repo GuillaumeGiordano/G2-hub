@@ -150,7 +150,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 3d | **Épinglage** des médias utilisés par un site (suppression bloquée dans la console : « utilisé par le site ») + **sélecteur de médiathèque** réutilisable pour les back-offices des sites |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
 | 5a ✅ | Utilisateurs des portails (comptes cloisonnés par application) : invitation par e-mail (console + API), choix / oubli du mot de passe, SMTP + Mailpit |
-| 5b | « Se connecter avec G2 Hub » : fournisseur OIDC (Authorization Code + PKCE) + portail de démo |
+| 5b ✅ | « Se connecter avec G2 Hub » : fournisseur OIDC (Authorization Code + PKCE) + portail de démo |
 | 5c | Espaces privés des utilisateurs d'application (fichiers rattachés à leur propriétaire) |
 
 Les étapes 0 à 3 suffisent pour vendre le cas « landing + galerie ».
@@ -561,7 +561,38 @@ en développement **Mailpit** (Docker) qui attrape tous les e-mails sans rien en
 - **Désactiver** garde le compte (et plus tard ses fichiers) mais coupe liens et connexion ;
   **supprimer** est définitif.
 
-## 25. Questions ouvertes
+## 25. « Se connecter avec G2 Hub » (étape 5b)
+
+✅ **2026-10-14 — G2 Hub est un fournisseur OpenID Connect** : un portail client délègue la
+connexion de ses utilisateurs au hub, avec n'importe quelle bibliothèque OIDC standard (rien de
+spécifique à G2 Hub côté portail). Interopérabilité vérifiée avec `openid-client` (certifié).
+
+✅ **2026-10-14 — Choix d'implémentation** :
+- **Un seul flux** : *Authorization Code + PKCE (S256 obligatoire)*, pour des portails qui ont un
+  serveur (client confidentiel : secret côté serveur). Pas de flux implicite, pas de refresh token.
+- `client_id` = identifiant de l'application ; **secret client** `g2_sso_…` affiché une fois,
+  seule son empreinte SHA-256 est stockée ; activer / renouveler / désactiver dans l'onglet
+  « Connexion » (owners). Désactiver révoque codes et jetons émis.
+- **URL de retour** déclarées par application, comparées **à l'identique** ; https obligatoire
+  (http seulement en local). Client inconnu ou URL non déclarée → erreur affichée SUR LE HUB,
+  jamais de redirection vers une adresse non vérifiée.
+- Implémentation **maison minimale** avec `jose` (signature), plutôt que `oidc-provider` (Koa,
+  mal intégrable à SvelteKit) : périmètre réduit = surface d'attaque réduite.
+- **ID token** JWT RS256 (10 min) : `sub` = id de l'AppUser, `aud` = client_id, `nonce`,
+  `auth_time`, `email` / `email_verified` (scope email), `name` (scope profile). Clé de signature
+  générée au premier usage, stockée en base, clé publique sur `/oauth/jwks`.
+- **Code** à usage unique (60 s) et **jeton d'accès** opaque (1 h, pour `/oauth/userinfo` et plus
+  tard l'API au nom de l'utilisateur) : stockés hachés, liés à l'application. Désactiver
+  l'utilisateur les révoque.
+- **Pas de session sur le hub** pour les utilisateurs de portail : chaque « Se connecter »
+  redemande le mot de passe (`prompt=none` → `login_required`) ; le portail garde SA session.
+- Page de connexion non intégrable dans un cadre (anti-clickjacking) ; 5 échecs par
+  (application, e-mail) → blocage 5 minutes ; même message et même durée que l'adresse existe ou non.
+- **CSRF** : le contrôle de SvelteKit est déplacé dans `hooks.server.ts` (même règle, en dev
+  aussi) pour exempter `/oauth/token`, appelé de serveur à serveur sans en-tête Origin et
+  authentifié par le secret client (jamais par un cookie).
+
+## 26. Questions ouvertes
 
 ❓ **Distribution du SDK** aux sites clients (dépôts séparés) : registre npm privé, paquet GitHub,
 ou installation depuis le dépôt git (comme `@guillaumeg/ui`) ?
