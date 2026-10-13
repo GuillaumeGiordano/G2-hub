@@ -28,6 +28,7 @@ model Organization {
   memberships  Membership[]
   applications Application[]
   folders      Folder[]
+  files        StoredFile[]
   /// Sessions currently working in this organization (cleared if it is deleted).
   sessions     Session[]
 }
@@ -95,12 +96,67 @@ model Folder {
   parentId       String?
   parent         Folder?      @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
   children       Folder[]     @relation("FolderTree")
+  files          StoredFile[]
   name           String
   visibility     Visibility
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId, applicationId, parentId])
+}
+
+enum FileKind {
+  IMAGE
+  VIDEO
+  PDF
+}
+
+/// Lifecycle of a stored file (DECISIONS.md §5): the browser uploads the original straight to S3
+/// (UPLOADING), the hub checks it and builds the processed versions (PROCESSING), then only those
+/// are kept (READY). FAILED keeps the row so the member sees what went wrong and can delete it.
+enum FileStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+/// A file of a folder. Only the PROCESSED versions are kept (WebP widths for an image, 1080p + poster
+/// for a video, the PDF itself) — the original is deleted once processed (§5).
+model StoredFile {
+  id             String       @id @default(uuid())
+  /// Denormalized from the folder: every query is scoped by organization (§13).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  folderId       String
+  folder         Folder       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  /// Display name (the uploaded file's name).
+  name           String
+  kind           FileKind
+  status         FileStatus   @default(UPLOADING)
+  /// The bucket the processed versions live in — copied from the folder at upload (§7).
+  visibility     Visibility
+  /// Object key prefix of the processed versions: `orgs/{org}/apps/{app}/files/{id}/`.
+  storagePrefix  String
+  /// Temporary key of the uploaded original (private bucket), null once processed.
+  originalKey    String?
+  /// The processed versions: [{ name, key, contentType, bytes, width?, height? }].
+  variants       Json         @default("[]")
+  /// Counts toward the organization's quota: the DECLARED size while uploading / processing (a
+  /// reservation), then the real total of the processed versions (§10).
+  bytes          BigInt
+  width          Int?
+  height         Int?
+  /// Why processing failed (shown to the member).
+  error          String?
+  uploadedById   String?
+  uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, folderId])
+  @@index([organizationId, status])
 }
 
 // ─── Authentication (Better Auth) ────────────────────────────────────────────
@@ -125,6 +181,7 @@ model User {
   accounts    Account[]
   twoFactors  TwoFactor[]
   memberships Membership[]
+  uploads     StoredFile[]
 
   @@map("user")
 }

@@ -34,6 +34,7 @@
 		"@lucide/svelte": "^1.22.0",
 		"better-auth": "^1.6.23",
 		"qrcode": "^1.5.4",
+		"sharp": "^0.35.5",
 		"zod": "^4.4.3"
 	}
 }

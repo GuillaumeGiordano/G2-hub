@@ -1,4 +1,6 @@
 import * as appRepo from '$lib/server/repositories/applicationRepository';
+import * as fileRepo from '$lib/server/repositories/fileRepository';
+import { purgeObjects } from '$lib/server/storage/purge';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { notFound } from '$lib/server/errors';
 import { slugify } from '$lib/utils/slug';
@@ -52,7 +54,10 @@ export async function updateApplication(
 	return input.name;
 }
 
+/** Delete an application: its stored objects first, then the row (folders and files cascade). */
 export async function deleteApplication(ctx: OrgContext, id: string): Promise<void> {
 	assertCan(ctx, 'applications.manage');
-	if (!(await appRepo.deleteApplication(ctx.organization.id, id))) throw notFound('Application introuvable.');
+	if (!(await appRepo.findApplication(ctx.organization.id, id))) throw notFound('Application introuvable.');
+	await purgeObjects(await fileRepo.listFilesForPurge(ctx.organization.id, id));
+	await appRepo.deleteApplication(ctx.organization.id, id);
 }

@@ -1,4 +1,4 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, json } from '@sveltejs/kit';
 import { HubError } from './errors';
 
 // Turn a service error into the right SvelteKit answer. Anything that is not a HubError is
@@ -9,6 +9,12 @@ export function actionFailure(err: unknown) {
 	if (!(err instanceof HubError)) throw err;
 	if (err.field) return fail(err.status, { errors: { [err.field]: err.message } });
 	return fail(err.status, { message: err.message });
+}
+
+/** In a JSON endpoint: `{ message }` with the HubError's status. */
+export function jsonFailure(err: unknown) {
+	if (!(err instanceof HubError)) throw err;
+	return json({ message: err.message }, { status: err.status });
 }
 
 /** In a load: the HubError's status page. */

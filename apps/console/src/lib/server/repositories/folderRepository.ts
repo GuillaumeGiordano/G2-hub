@@ -57,6 +57,20 @@ export async function renameFolder(organizationId: string, id: string, name: str
 	return count;
 }
 
+/** Ids of a folder and of every folder below it (breadth-first, one query per level). */
+export async function listSubtreeIds(organizationId: string, rootId: string): Promise<string[]> {
+	const ids = [rootId];
+	for (let level = [rootId]; level.length; ) {
+		const children = await prisma.folder.findMany({
+			where: { organizationId, parentId: { in: level } },
+			select: { id: true }
+		});
+		level = children.map((c) => c.id);
+		ids.push(...level);
+	}
+	return ids;
+}
+
 /** Delete a folder and, by cascade, its whole subtree. Returns 0 if not in this organization. */
 export async function deleteFolder(organizationId: string, id: string) {
 	const { count } = await prisma.folder.deleteMany({ where: { id, organizationId } });

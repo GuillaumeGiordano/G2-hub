@@ -2,6 +2,8 @@ import { prisma } from '$lib/server/db';
 import * as orgRepo from '$lib/server/repositories/organizationRepository';
 import * as membershipRepo from '$lib/server/repositories/membershipRepository';
 import * as sessionRepo from '$lib/server/repositories/sessionRepository';
+import * as fileRepo from '$lib/server/repositories/fileRepository';
+import { purgeObjects } from '$lib/server/storage/purge';
 import { toActiveOrganization, toOrganizationListItem } from '$lib/server/mappers/organizationMapper';
 import { ensureAccount } from './accountService';
 import { forbidden, notFound } from '$lib/server/errors';
@@ -80,11 +82,13 @@ export async function updateOrganization(
 	return org.name;
 }
 
-/** Delete an organization (its memberships and applications cascade) — superadmin only. Its
- *  members keep their account: they may belong to other organizations. */
+/** Delete an organization — superadmin only: its stored objects first, then the row (memberships,
+ *  applications, folders and files cascade). Its members keep their account: they may belong to
+ *  other organizations. */
 export async function deleteOrganization(actor: Actor, id: string): Promise<string> {
 	if (!actor.isSuperadmin) throw forbidden();
 	if (!(await orgRepo.findOrganizationById(id))) throw notFound('Organisation introuvable.');
+	await purgeObjects(await fileRepo.listFilesForPurge(id));
 	const org = await orgRepo.deleteOrganization(id);
 	return org.name;
 }

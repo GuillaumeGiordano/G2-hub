@@ -142,7 +142,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 0 ✅ | Scaffold du monorepo, Docker (Postgres + MinIO), Better Auth, layout de la console, script d'installation (1er superadmin) |
 | 1 ✅ | Organisations, membres et rôles, applications |
 | 2a ✅ | Dossiers imbriqués (publics / privés) par application, navigation dans la console |
-| 2b | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
+| 2b ✅ | Fichiers : upload présigné vers S3, contrôles de taille et de quota (1 Go), images → WebP, liste / aperçu / suppression |
 | 2c | Vidéos (ffmpeg, 1080p + poster), PDF, file de traitement en base |
 | 3 | API publique + clés + CORS + SDK, avec une landing de démo et sa galerie branchée |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
@@ -329,6 +329,42 @@ partir de l'étape 2b — y compris sur S3), après confirmation.
 partir du rôle `editor`. Une organisation en offre « Accès » (sans stockage) ne peut pas créer de
 dossier.
 
-## 16. Questions ouvertes
+## 16. Choix d'implémentation de l'étape 2b (fichiers)
+
+💡 **Envoi en trois temps** : 1. la console demande un « ticket » (type, taille et quota vérifiés) ;
+2. le navigateur envoie l'original **directement** au stockage (URL présignée valable 15 min) ;
+3. la console confirme, le hub vérifie la réception et fabrique les versions traitées.
+
+💡 **Réservation** : dès le ticket, la taille déclarée **compte dans le quota** (verrou sur
+l'organisation pour que deux envois simultanés ne voient pas le même espace libre). Après
+traitement, elle est remplacée par la taille réelle des versions gardées ; un échec compte 0.
+
+💡 **La signature de l'URL inclut la taille et le type déclarés** : le stockage refuse tout autre
+contenu, donc la taille contrôlée par le quota est bien celle reçue.
+
+💡 **Les originaux arrivent toujours dans le bucket privé** (`tmp/…`), jamais exposés, même le temps
+du traitement ; ils sont supprimés une fois traités.
+
+💡 **Images** : WebP qualité 80 en 400 / 1200 / 2560 px de large (jamais agrandies), orientation EXIF
+appliquée, métadonnées retirées, GIF / WebP animés conservés animés. **HEIC refusé** (photos
+iPhone : le serveur ne sait pas le décoder) — exporter en JPEG.
+
+💡 **Versions servies avec un cache d'un an `immutable`** : une clé contient l'id du fichier et n'est
+jamais réutilisée.
+
+💡 **Envoi un fichier à la fois** dans la console (quota vérifié dans l'ordre, VPS ménagé), avec
+une barre de progression par fichier.
+
+💡 **Supprimer** un fichier, un dossier, une application ou une organisation supprime d'abord ses
+objets sur le stockage, puis les lignes — l'espace est libéré immédiatement.
+
+⚠️ **À prévoir en prod** : le bucket Infomaniak doit autoriser en **CORS** les `PUT` venant du
+domaine de la console (MinIO l'autorise par défaut en dev). À faire au déploiement.
+
+⚠️ **Envois abandonnés** (onglet fermé avant la fin) : le fichier reste « Envoi… » et sa réservation
+compte dans le quota jusqu'à sa suppression. Un nettoyage automatique (après 1 h) arrive avec la
+file de traitement de l'étape 2c.
+
+## 17. Questions ouvertes
 
 Aucune pour l'instant.

@@ -1,5 +1,7 @@
 import * as appRepo from '$lib/server/repositories/applicationRepository';
 import * as folderRepo from '$lib/server/repositories/folderRepository';
+import * as fileRepo from '$lib/server/repositories/fileRepository';
+import { purgeObjects } from '$lib/server/storage/purge';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { can } from '$lib/records/organization';
 import { forbidden, HubError, notFound } from '$lib/server/errors';
@@ -11,20 +13,20 @@ import type { FolderBrowser, FolderCrumb } from '$lib/viewmodels/folder';
 // member, written by EDITOR and up. Storage is an option of the offer (§12).
 
 /** Throw 403 when the organization did not subscribe to the storage option. */
-function assertStorageEnabled(ctx: OrgContext) {
+export function assertStorageEnabled(ctx: OrgContext) {
 	if (!ctx.organization.storageEnabled) {
 		throw forbidden("L'option stockage n'est pas activée pour cette organisation.");
 	}
 }
 
-async function applicationOrThrow(ctx: OrgContext, applicationId: string) {
+export async function applicationOrThrow(ctx: OrgContext, applicationId: string) {
 	const app = await appRepo.findApplication(ctx.organization.id, applicationId);
 	if (!app) throw notFound('Application introuvable.');
 	return app;
 }
 
 /** A folder of THIS application of THIS organization, or 404. */
-async function folderOrThrow(ctx: OrgContext, applicationId: string, folderId: string) {
+export async function folderOrThrow(ctx: OrgContext, applicationId: string, folderId: string) {
 	const folder = await folderRepo.findFolder(ctx.organization.id, folderId);
 	if (!folder || folder.applicationId !== applicationId) throw notFound('Dossier introuvable.');
 	return folder;
@@ -118,10 +120,13 @@ export async function renameFolder(
 	return name;
 }
 
-/** Delete a folder and its whole subtree (its files too, once they exist — step 2b). */
+/** Delete a folder, its whole subtree and every file in it — the stored objects first, then the
+ *  rows (folders and files cascade), which frees their bytes at once (§10). */
 export async function deleteFolder(ctx: OrgContext, applicationId: string, folderId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
 	assertStorageEnabled(ctx);
 	const folder = await folderOrThrow(ctx, applicationId, folderId);
+	const folderIds = await folderRepo.listSubtreeIds(ctx.organization.id, folder.id);
+	await purgeObjects(await fileRepo.listFilesInFolders(ctx.organization.id, folderIds));
 	await folderRepo.deleteFolder(ctx.organization.id, folder.id);
 }

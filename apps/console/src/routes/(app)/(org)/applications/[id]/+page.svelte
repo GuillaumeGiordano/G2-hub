@@ -10,15 +10,32 @@
 		EmptyState,
 		Input,
 		Modal,
+		Progress,
 		RadioGroup,
-		Table
+		Table,
+		toast
 	} from '@guillaumeg/ui';
-	import { EllipsisVertical, Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from '@lucide/svelte';
+	import {
+		EllipsisVertical,
+		ExternalLink,
+		FileText,
+		Folder,
+		FolderOpen,
+		FolderPlus,
+		Image,
+		Link,
+		Pencil,
+		Trash2
+	} from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
+	import Uploader from '$lib/components/files/Uploader.svelte';
+	import { fileKindLabel, fileStatusLabel, fileStatusVariant } from '$lib/records/files';
+	import { formatBytes } from '$lib/records/organization';
 	import { visibilityHint, visibilityLabel, visibilityOptions, visibilityVariant } from '$lib/records/storage';
 	import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
+	import type { FileListItem } from '$lib/viewmodels/file';
 	import type { FolderListItem } from '$lib/viewmodels/folder';
 	import type { PageData } from './$types';
 
@@ -35,7 +52,12 @@
 		...(b.folder ? [{ label: b.folder.name }] : [])
 	]);
 
+	const usagePercent = $derived(Math.min(100, Math.round((data.usage.usedBytes / data.usage.quotaBytes) * 100)));
+	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' });
+
 	const CREATE_MODAL_ID = 'folder-create';
+	const DELETE_FILE_MODAL_ID = 'file-delete';
+	let fileToDelete = $state<FileListItem | null>(null);
 	const RENAME_MODAL_ID = 'folder-rename';
 	const DELETE_MODAL_ID = 'folder-delete';
 
@@ -69,6 +91,17 @@
 	function openDelete(folder: FolderListItem) {
 		target = folder;
 		modal(DELETE_MODAL_ID)?.showModal();
+	}
+
+	function openDeleteFile(file: FileListItem) {
+		fileToDelete = file;
+		modal(DELETE_FILE_MODAL_ID)?.showModal();
+	}
+
+	async function copyPublicUrl(file: FileListItem) {
+		if (!file.publicUrl) return;
+		await navigator.clipboard.writeText(file.publicUrl);
+		toast.success('Lien public copié.');
 	}
 </script>
 
@@ -115,6 +148,76 @@
 	</div>
 {/snippet}
 
+{#snippet previewCell(file: FileListItem)}
+	{#if file.thumbUrl}
+		<img class="thumb" src={file.thumbUrl} alt="" loading="lazy" />
+	{:else}
+		<span class="thumb thumb-icon">
+			{#if file.kind === 'PDF'}<FileText size={20} />{:else}<Image size={20} />{/if}
+		</span>
+	{/if}
+{/snippet}
+
+{#snippet fileNameCell(file: FileListItem)}
+	<div class="strong file-name">{file.name}</div>
+	<div class="slug">
+		{fileKindLabel[file.kind]}{file.width ? ` · ${file.width} × ${file.height}` : ''}
+	</div>
+	{#if file.error}<div class="file-error">{file.error}</div>{/if}
+{/snippet}
+
+{#snippet fileSizeCell(file: FileListItem)}
+	{file.status === 'READY' ? formatBytes(file.bytes) : '—'}
+{/snippet}
+
+{#snippet fileStatusCell(file: FileListItem)}
+	<Badge label={fileStatusLabel[file.status]} variant={fileStatusVariant[file.status]} />
+{/snippet}
+
+{#snippet fileDateCell(file: FileListItem)}
+	{dateFormat.format(file.createdAt)}
+{/snippet}
+
+{#snippet fileActionsCell(file: FileListItem)}
+	<div class="actions">
+		<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
+			{#snippet items(close)}
+				{#if file.viewUrl}
+					<ButtonActionItem
+						label="Ouvrir"
+						icon={ExternalLink}
+						onclick={() => {
+							window.open(file.viewUrl!, '_blank', 'noopener');
+							close();
+						}}
+					/>
+				{/if}
+				{#if file.publicUrl}
+					<ButtonActionItem
+						label="Copier le lien public"
+						icon={Link}
+						onclick={() => {
+							copyPublicUrl(file);
+							close();
+						}}
+					/>
+				{/if}
+				{#if b.canWrite}
+					<ButtonActionItem
+						label="Supprimer"
+						icon={Trash2}
+						variant="danger"
+						onclick={() => {
+							openDeleteFile(file);
+							close();
+						}}
+					/>
+				{/if}
+			{/snippet}
+		</ButtonAction>
+	</div>
+{/snippet}
+
 <div class="page">
 	<Breadcrumb items={crumbs} />
 
@@ -131,12 +234,25 @@
 		{/if}
 	</SuperTitle>
 
+	{#if b.storageEnabled}
+		<Progress
+			value={usagePercent}
+			label={`Stockage : ${formatBytes(data.usage.usedBytes)} utilisés sur ${formatBytes(data.usage.quotaBytes)}`}
+			showValue
+			color={usagePercent >= 90 ? 'danger' : usagePercent >= 75 ? 'warning' : 'primary'}
+		/>
+	{/if}
+
+	{#if b.folder && b.canWrite && b.storageEnabled}
+		<Uploader applicationId={b.application.id} folderId={b.folder.id} />
+	{/if}
+
 	{#if !b.storageEnabled}
 		<Alert variant="info" title="Option stockage non activée">
 			Cette organisation a l'offre « Accès » : la gestion des fichiers fait partie de l'offre « Accès
 			+ Stockage ».
 		</Alert>
-	{:else if b.folders.length === 0}
+	{:else if b.folders.length === 0 && data.files.length === 0}
 		<EmptyState
 			icon={FolderOpen}
 			title={b.folder ? 'Dossier vide' : 'Aucun dossier'}
@@ -145,7 +261,7 @@
 				: 'Créez un dossier public pour les médias du site, ou privé pour des fichiers personnels.'}
 			cta={b.canWrite ? { label: 'Créer un dossier', onclick: openCreate } : undefined}
 		/>
-	{:else}
+	{:else if b.folders.length}
 		<Table
 			rows={b.folders}
 			columns={[
@@ -153,6 +269,20 @@
 				{ key: 'visibility', label: 'Visibilité', cell: visibilityCell },
 				{ key: 'folderCount', label: 'Contenu', cell: contentCell },
 				...(b.canWrite ? [{ key: 'id' as const, label: '', align: 'right' as const, cell: actionsCell }] : [])
+			]}
+		/>
+	{/if}
+
+	{#if b.storageEnabled && data.files.length}
+		<Table
+			rows={data.files}
+			columns={[
+				{ key: 'thumbUrl', label: '', width: '64px', cell: previewCell },
+				{ key: 'name', label: 'Fichier', cell: fileNameCell },
+				{ key: 'bytes', label: 'Taille', align: 'right', cell: fileSizeCell },
+				{ key: 'status', label: 'État', cell: fileStatusCell },
+				{ key: 'createdAt', label: 'Ajouté le', cell: fileDateCell },
+				{ key: 'id', label: '', align: 'right', cell: fileActionsCell }
 			]}
 		/>
 	{/if}
@@ -236,7 +366,55 @@
 	</form>
 </Modal>
 
+<Modal id={DELETE_FILE_MODAL_ID} title="Supprimer le fichier">
+	<p class="confirm-text">
+		Supprimer <strong>{fileToDelete?.name}</strong> ? Il disparaît aussi des sites qui l'affichent, et
+		son espace est libéré. Cette action est <strong>irréversible</strong>.
+	</p>
+	<form
+		method="POST"
+		action="?/deleteFile"
+		class="confirm-actions"
+		use:enhance={toastEnhance({
+			success: 'Fichier supprimé.',
+			onSuccess: () => modal(DELETE_FILE_MODAL_ID)?.close(),
+			setBusy
+		})}
+	>
+		<input type="hidden" name="id" value={fileToDelete?.id} />
+		<Button type="button" variant="ghost" onclick={() => modal(DELETE_FILE_MODAL_ID)?.close()}>Annuler</Button>
+		<Button type="submit" variant="danger" icon={Trash2} loading={busy}>Supprimer définitivement</Button>
+	</form>
+</Modal>
+
 <style>
+	.thumb {
+		display: block;
+		width: 48px;
+		height: 48px;
+		border-radius: var(--radius-md);
+		object-fit: cover;
+		background: var(--bg-muted);
+	}
+	.thumb-icon {
+		display: grid;
+		place-items: center;
+		color: var(--text-subtle);
+	}
+	.slug {
+		font-size: 12px;
+		color: var(--text-subtle);
+	}
+	.file-name {
+		max-width: 320px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.file-error {
+		font-size: 12px;
+		color: var(--danger);
+	}
 	.folder-link {
 		display: inline-flex;
 		align-items: center;
