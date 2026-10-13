@@ -33,7 +33,8 @@ architecture and the step-by-step roadmap).
 
 ```bash
 pnpm install        # also generates the Prisma client (packages/db postinstall)
-pnpm db:up          # Postgres (localhost:5433) + MinIO (API :9100, console :9101) — do this first
+pnpm db:up          # Postgres (:5433) + MinIO (API :9100, console :9101) + Mailpit (SMTP :1125,
+                    # inbox http://localhost:8125) — do this first
 pnpm db:deploy      # apply the migrations
 pnpm hub:install    # create the first superadmin (ADMIN_* from .env) — once per instance
 pnpm dev            # console on http://localhost:5180
@@ -76,7 +77,7 @@ packages/sdk/       @g2/hub-client — the client sites' SDK (no dependency, bro
 apps/demo-landing/  Demo client site (port 5190, `pnpm dev:demo`): gallery read server-side with a
                     publishable key (DEMO_HUB_* in .env) — the template for real client sites.
 docker-compose.yml  Postgres 17 + MinIO with the two buckets (g2hub-public anonymous-read,
-                    g2hub-private never public).
+                    g2hub-private never public) + Mailpit (catches every e-mail in dev).
 ```
 
 ## Target stack (proposed — see DECISIONS.md for what is validated)
@@ -85,7 +86,7 @@ docker-compose.yml  Postgres 17 + MinIO with the two buckets (g2hub-public anony
   - `apps/console` — SvelteKit 2 + Svelte 5 (runes): the back-office AND the public API (`/api/v1/…`).
   - `packages/db` — Prisma schema, migrations, generated client.
   - `packages/sdk` — small TypeScript client (`@g2/hub-client`) for client applications.
-- Better Auth (console accounts; later its OIDC provider plugin for portal SSO).
+- Better Auth (console accounts only). Portal end users are a separate model (`AppUser`).
 - PostgreSQL, S3-compatible object storage (MinIO in dev, Infomaniak Object Storage in prod).
 - UI: `@guillaumeg/ui` + TailwindCSS v4 + `@lucide/svelte`.
 - Deployment: Docker + `@sveltejs/adapter-node` on an Infomaniak VPS.
@@ -111,6 +112,14 @@ English code, Conventional Commits).
   Writes (uploads, file alt / caption, delete) need a SECRET key and reuse the SAME core as the
   console (`fileService.reserveUpload` / `confirmUpload` / `removeFile` / `setFileText`). A file
   sent by a site (`StoredFile.source = API`) is read-only in the console: only the site deletes it.
+- **Two kinds of accounts, never mixed** (DECISIONS.md §24): console members are Better Auth
+  `user`s; portal end users are `AppUser`s, isolated per APPLICATION (unique application + e-mail),
+  with their own scrypt hash (`lib/server/passwords.ts`) — they can never sign in to the console.
+  They are invited (console tab « Utilisateurs », or `POST /api/v1/users` with a secret key) and
+  choose their password from an e-mailed single-use link (`/mot-de-passe/[token]`, only the token's
+  SHA-256 stored); `/mot-de-passe-oublie?app=` never reveals whether an address has an account.
+- **E-mails** go through `lib/server/mail` (SMTP from .env: Mailpit in dev, Infomaniak in prod).
+  Every value inserted in an e-mail's HTML is escaped (application names are typed by clients).
 - **Never delete tenant data with raw SQL** in dev: it skips the storage purge and leaves orphan
   objects in the buckets — delete through the console (or the services).
 - Record every validated decision in `DECISIONS.md` (date + decision + why) before or with the

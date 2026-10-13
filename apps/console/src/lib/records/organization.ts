@@ -22,12 +22,13 @@ export function isOrgRole(value: unknown): value is OrgRole {
 	return typeof value === 'string' && (ORG_ROLES as readonly string[]).includes(value);
 }
 
-/** What a member may do in its organization (DECISIONS.md §3). The superadmin may do everything. */
-export type OrgPermission = 'members.manage' | 'applications.manage' | 'files.write' | 'read';
+/** What a member may do in its organization (DECISIONS.md §3). The superadmin may do everything.
+ *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
+export type OrgPermission = 'members.manage' | 'applications.manage' | 'appUsers.manage' | 'files.write' | 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	OWNER: ['members.manage', 'applications.manage', 'files.write', 'read'],
-	EDITOR: ['files.write', 'read'],
+	OWNER: ['members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read'],
+	EDITOR: ['appUsers.manage', 'files.write', 'read'],
 	VIEWER: ['read']
 };
 

@@ -16,6 +16,7 @@
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.1",
+		"@types/nodemailer": "^8.0.2",
 		"@types/qrcode": "^1.5.6",
 		"dotenv": "^17.4.2",
 		"sass-embedded": "^1.100.0",
@@ -33,6 +34,7 @@
 		"@guillaumeg/ui": "github:GuillaumeGiordano/my-components",
 		"@lucide/svelte": "^1.22.0",
 		"better-auth": "^1.6.23",
+		"nodemailer": "^10.1.0",
 		"qrcode": "^1.5.4",
 		"sharp": "^0.35.5",
 		"zod": "^4.4.3"

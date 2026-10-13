@@ -1,15 +1,15 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { twoFactor } from 'better-auth/plugins';
-import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { prisma } from './db';
-import { hubName } from './instance';
+import { hubName, hubUrl } from './instance';
 
 // Console accounts. No public sign-up: the first superadmin comes from `pnpm hub:install`, the
-// others are invited from the console (step 1). No email verification yet → no SMTP.
+// others are invited from the console (step 1). No email verification. (Application users — portal
+// end users — are NOT Better Auth accounts: see appUserService.)
 export const auth = betterAuth({
-	baseURL: env.ORIGIN || (dev ? 'http://localhost:5180' : undefined),
+	baseURL: hubUrl() || undefined,
 	secret: env.BETTER_AUTH_SECRET,
 	database: prismaAdapter(prisma, { provider: 'postgresql' }),
 

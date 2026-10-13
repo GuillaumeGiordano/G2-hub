@@ -149,7 +149,9 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | 3c ✅ | API d'écriture avec la clé secrète (envoi / suppression depuis le serveur d'un site) + admin de démo |
 | 3d | **Épinglage** des médias utilisés par un site (suppression bloquée dans la console : « utilisé par le site ») + **sélecteur de médiathèque** réutilisable pour les back-offices des sites |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
-| 5 | SSO pour les portails (OIDC) + espaces privés des utilisateurs d'application — utile au portail G2 WebDev |
+| 5a ✅ | Utilisateurs des portails (comptes cloisonnés par application) : invitation par e-mail (console + API), choix / oubli du mot de passe, SMTP + Mailpit |
+| 5b | « Se connecter avec G2 Hub » : fournisseur OIDC (Authorization Code + PKCE) + portail de démo |
+| 5c | Espaces privés des utilisateurs d'application (fichiers rattachés à leur propriétaire) |
 
 Les étapes 0 à 3 suffisent pour vendre le cas « landing + galerie ».
 
@@ -541,6 +543,23 @@ plus tard.
 
 ✅ **2026-10-14 — E-mails via un SMTP configurable** (`.env`) ; en production une boîte Infomaniak,
 en développement **Mailpit** (Docker) qui attrape tous les e-mails sans rien envoyer.
+
+✅ **2026-10-14 — Choix d'implémentation de l'étape 5a** :
+- Table **`AppUser`** séparée du `user` de Better Auth (dont l'e-mail est unique sur toute
+  l'instance) : contrainte unique (application, e-mail). Un compte de portail ne peut donc pas
+  ouvrir la console.
+- Statut **déduit**, jamais stocké : désactivé › sans mot de passe = invité › actif.
+- Mots de passe hachés en **scrypt** (intégré à Node, coûteux en calcul ET en mémoire), paramètres
+  stockés avec le hachage pour pouvoir les relever plus tard.
+- Liens par e-mail à **usage unique** : 32 octets aléatoires, seule leur empreinte SHA-256 est
+  stockée ; invitation valable 7 jours, réinitialisation 1 heure ; un nouveau lien annule les
+  précédents ; page servie avec `Referrer-Policy: no-referrer` (le jeton est dans l'URL).
+- **Mot de passe oublié** : même réponse que l'adresse ait un compte ou non, envoi en arrière-plan
+  (ni la réponse ni sa durée ne trahissent qui est inscrit), au plus un e-mail par 2 minutes.
+- Gérés par les **owner et editor** (nouveau droit `appUsers.manage`) ; les viewer les consultent.
+- Invitation **annulée** si l'e-mail ne part pas (sinon personne ne peut activer le compte).
+- **Désactiver** garde le compte (et plus tard ses fichiers) mais coupe liens et connexion ;
+  **supprimer** est définitif.
 
 ## 25. Questions ouvertes
 

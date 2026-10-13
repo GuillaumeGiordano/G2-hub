@@ -25,6 +25,11 @@ export class ApiError extends Error {
 	}
 }
 
+/** Writes (and anything touching users) need the SECRET key — server-side only. */
+export function requireSecret(ctx: ApiContext): void {
+	if (ctx.kind !== 'SECRET') throw new ApiError(403, 'Opération réservée à une clé secrète (côté serveur).');
+}
+
 /** Refresh `lastUsedAt` at most this often (no write per request). */
 const TOUCH_EVERY_MS = 5 * 60_000;
 

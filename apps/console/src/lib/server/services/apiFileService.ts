@@ -1,6 +1,6 @@
 import * as orgRepo from '$lib/server/repositories/organizationRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
-import { ApiError, type ApiContext } from '$lib/server/api/auth';
+import { ApiError, requireSecret, type ApiContext } from '$lib/server/api/auth';
 import { apiFileTextSchema, apiUploadSchema, firstIssue } from '$lib/schemas/apiFile';
 import { assertStorage, canSee, resolveFolder, toApiFile, type ApiFile } from './publicApiService';
 import { confirmUpload, removeFile, reserveUpload, setFileText } from './fileService';
@@ -10,10 +10,6 @@ import { confirmUpload, removeFile, reserveUpload, setFileText } from './fileSer
 // an upload ticket, its visitor's browser PUTs the file straight to storage with the signed URL (the
 // secret key never leaves the server), then the server confirms and stores the returned file id in
 // its own database. The file shows up in the hub's media library, flagged as sent by the site.
-
-function requireSecret(ctx: ApiContext) {
-	if (ctx.kind !== 'SECRET') throw new ApiError(403, 'Opération réservée à une clé secrète (côté serveur).');
-}
 
 /** A file of the key's application, or 404 (another application's / organization's id included). */
 async function fileOrThrow(ctx: ApiContext, fileId: string) {

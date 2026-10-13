@@ -30,6 +30,7 @@ model Organization {
   folders      Folder[]
   files        StoredFile[]
   apiKeys      ApiKey[]
+  appUsers     AppUser[]
   /// Sessions currently working in this organization (cleared if it is deleted).
   sessions     Session[]
 }
@@ -70,8 +71,9 @@ model Application {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  folders Folder[]
-  apiKeys ApiKey[]
+  folders  Folder[]
+  apiKeys  ApiKey[]
+  appUsers AppUser[]
 
   @@unique([organizationId, slug])
 }
@@ -265,6 +267,8 @@ model User {
   memberships Membership[]
   uploads     StoredFile[]
   apiKeys     ApiKey[]
+  /// Application users this member invited.
+  invitedAppUsers AppUser[]
 
   @@map("user")
 }
@@ -333,4 +337,56 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// ─── Application users (portal end users) — DECISIONS.md §24 ─────────────────────────────────
+
+/// Someone who signs in to a client's PORTAL (not to the console): an account isolated in ONE
+/// application — the same e-mail may have separate accounts in two applications. Created by
+/// invitation; never able to sign in to the console (separate table from Better Auth's `user`).
+model AppUser {
+  id             String       @id @default(uuid())
+  /// Denormalized from the application: every query is scoped by organization (§13).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Lowercased and trimmed.
+  email          String
+  name           String
+  /// scrypt hash (`scrypt$N$r$p$salt$hash`); null until the invitation is accepted.
+  passwordHash   String?
+  /// Set when disabled by the organization: links and sign-in refused, the account is kept.
+  disabledAt     DateTime?
+  lastLoginAt    DateTime?
+  invitedById    String?
+  invitedBy      User?        @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tokens AppUserToken[]
+
+  @@unique([applicationId, email])
+  @@index([organizationId, applicationId])
+}
+
+enum AppUserTokenPurpose {
+  /// Sent at invitation: choose a password and activate the account (7 days).
+  INVITATION
+  /// « Mot de passe oublié » (1 hour).
+  PASSWORD_RESET
+}
+
+/// A single-use link sent by e-mail. Only the SHA-256 of the random token is stored.
+model AppUserToken {
+  id        String              @id @default(uuid())
+  appUserId String
+  appUser   AppUser             @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  purpose   AppUserTokenPurpose
+  hash      String              @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([appUserId, purpose])
 }

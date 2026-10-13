@@ -99,6 +99,41 @@ body {
 	box-shadow: var(--shadow-md);
 }
 
+/* Header and footer of the application users' pages (choose / forgot password). */
+.auth-brand {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.auth-logo {
+	display: grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	border-radius: var(--radius-lg);
+	background: var(--primary-subtle);
+	color: var(--primary);
+}
+
+.auth-title {
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--text-heading);
+}
+
+.auth-sub {
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.auth-note {
+	margin: 0;
+	font-size: 12px;
+	text-align: center;
+	color: var(--text-subtle);
+}
+
 @media (max-width: 640px) {
 	.page {
 		padding: 4px 0 32px;

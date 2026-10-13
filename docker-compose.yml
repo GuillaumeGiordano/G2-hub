@@ -1,6 +1,6 @@
 # Local development services only. These credentials are NOT secrets — production uses
 # PostgreSQL + Infomaniak Object Storage with their own credentials.
-# Host ports are shifted (5433, 9100, 9101) so G2 Hub can run alongside other local projects.
+# Host ports are shifted (5433, 9100, 9101, 1125, 8125) so G2 Hub can run alongside other local projects.
 name: g2-hub
 
 services:
@@ -55,6 +55,16 @@ services:
       mc anonymous set download local/g2hub-public;
       exit 0;
       "
+
+  # --- Mailpit: catches every e-mail the hub sends (invitations, password resets) — nothing
+  # leaves the machine. Inbox: http://localhost:8125. Prod: a real SMTP server (Infomaniak).
+  mail:
+    image: axllent/mailpit
+    container_name: g2hub-mail
+    restart: unless-stopped
+    ports:
+      - '1125:1025' # SMTP
+      - '8125:8025' # Web inbox
 
 volumes:
   pgdata:
