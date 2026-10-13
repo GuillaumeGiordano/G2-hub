@@ -1,0 +1,61 @@
+# Local development services only. These credentials are NOT secrets — production uses
+# PostgreSQL + Infomaniak Object Storage with their own credentials.
+# Host ports are shifted (5433, 9100, 9101) so G2 Hub can run alongside other local projects.
+name: g2-hub
+
+services:
+  # --- PostgreSQL (17, like the production VPS) ---
+  db:
+    image: postgres:17
+    container_name: g2hub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: g2hub
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: g2hub
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U g2hub -d g2hub']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- MinIO: local S3-compatible storage mimicking Infomaniak Object Storage. ---
+  # Same S3 API in dev and prod — only S3_ENDPOINT differs.
+  # Console: http://localhost:9101 (minioadmin / minioadmin)
+  s3:
+    image: minio/minio
+    container_name: g2hub-s3
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9100:9000' # S3 API
+      - '9101:9001' # Web console
+    volumes:
+      - miniodata:/data
+
+  # --- One-shot: create the two buckets, then exit. ---
+  # The public bucket is anonymously readable (files served straight to client sites);
+  # the private one is never readable without a signed link (see DECISIONS.md §7).
+  s3-init:
+    image: minio/mc
+    depends_on:
+      - s3
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://s3:9000 minioadmin minioadmin; do echo 'waiting for minio...'; sleep 2; done;
+      mc mb --ignore-existing local/g2hub-public;
+      mc mb --ignore-existing local/g2hub-private;
+      mc anonymous set download local/g2hub-public;
+      exit 0;
+      "
+
+volumes:
+  pgdata:
+  miniodata:

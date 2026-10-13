@@ -1,0 +1,18 @@
+{
+	"name": "g2-hub",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@11.5.2",
+	"scripts": {
+		"dev": "pnpm --filter console dev",
+		"build": "pnpm -r build",
+		"check": "pnpm -r check",
+		"db:up": "docker compose up -d",
+		"db:down": "docker compose down",
+		"db:migrate": "pnpm --filter @g2-hub/db migrate",
+		"db:deploy": "pnpm --filter @g2-hub/db deploy",
+		"db:generate": "pnpm --filter @g2-hub/db generate",
+		"db:studio": "pnpm --filter @g2-hub/db studio",
+		"hub:install": "pnpm --filter console exec tsx scripts/install.ts"
+	}
+}

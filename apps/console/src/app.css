@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+@import '@guillaumeg/ui/styles/tokens.css'; /* base tokens + blue theme by default */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+	background: var(--bg-base);
+	color: var(--text-base);
+	min-height: 100dvh;
+}
+
+/* ── Shared layout + utility classes (one definition — never re-declared in a component) ── */
+
+/* Page shell: centered column used by every console page. */
+.page {
+	max-width: 960px;
+	margin: 0 auto;
+	padding: 28px 28px 48px;
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.card-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-heading);
+}
+
+.muted {
+	color: var(--text-muted);
+}
+
+/* Full-screen centered card of the sign-in screens (login, 2FA challenge). */
+.auth-screen {
+	min-height: 100dvh;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	background: var(--bg-subtle);
+}
+
+.auth-card {
+	width: min(380px, 100%);
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 28px;
+	background: var(--bg-base);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-xl);
+	box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 640px) {
+	.page {
+		padding: 4px 0 32px;
+		gap: 16px;
+	}
+}

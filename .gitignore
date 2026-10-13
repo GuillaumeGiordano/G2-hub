@@ -1,0 +1,19 @@
+node_modules
+.env
+.env.*
+!.env.example
+
+# Build output
+build
+.svelte-kit
+dist
+
+# Prisma generated client
+packages/db/src/generated
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
