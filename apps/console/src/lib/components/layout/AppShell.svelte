@@ -4,24 +4,29 @@
 	import { page } from '$app/state';
 	import { LogOut, Menu, Network } from '@lucide/svelte';
 	import { Button, Modal, Sidebar, StandardLayout, ThemeToggle } from '@guillaumeg/ui';
-	import { isNavItemActive, NAV } from '$lib/records/navigation';
-	import { isSuperadmin, labelForRole } from '$lib/records/roles';
+	import { isNavItemActive, NAV, type NavContext } from '$lib/records/navigation';
+	import { labelForRole } from '$lib/records/roles';
 	import { authClient } from '$lib/auth-client';
 
 	let {
 		hubName,
+		organizationName,
 		user,
+		nav,
 		children
 	}: {
 		hubName: string;
+		/** The active organization, shown under the hub name (null: none selected). */
+		organizationName: string | null;
 		user: { name: string; role?: string | null };
+		nav: NavContext;
 		children: Snippet;
 	} = $props();
 
 	const groups = $derived(
-		NAV.filter((section) => !section.superadminOnly || isSuperadmin(user.role)).map((section) => ({
+		NAV.filter((section) => section.visible?.(nav) ?? true).map((section) => ({
 			label: section.label,
-			items: section.items.map((item) => ({
+			items: section.items.filter((item) => item.visible?.(nav) ?? true).map((item) => ({
 				label: item.label,
 				href: item.href,
 				icon: item.icon,
@@ -47,7 +52,10 @@
 {#snippet brand()}
 	<div class="brand">
 		<span class="brand-logo"><Network size={20} /></span>
-		<div class="brand-name">{hubName}</div>
+		<div class="brand-text">
+			<div class="brand-name">{hubName}</div>
+			<div class="brand-sub">{organizationName ?? 'Aucune organisation'}</div>
+		</div>
 	</div>
 {/snippet}
 
@@ -121,11 +129,21 @@
 		color: var(--primary);
 		flex-shrink: 0;
 	}
+	.brand-text {
+		min-width: 0;
+	}
 	.brand-name {
 		font-size: 15px;
 		font-weight: 700;
 		color: var(--text-heading);
 		white-space: nowrap;
+	}
+	.brand-sub {
+		font-size: 11px;
+		color: var(--text-subtle);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.foot {
 		display: flex;

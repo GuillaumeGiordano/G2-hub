@@ -1,8 +1,8 @@
-import { requiresTwoFactor } from '$lib/records/roles';
 import type { PageServerLoad } from './$types';
 
-// The account's 2FA state; `mandatory` locks deactivation for the roles that require it.
+// The account's 2FA state; `mandatory` (superadmin or organization owner, computed by the hook)
+// locks deactivation.
 export const load: PageServerLoad = ({ locals }) => ({
 	twoFactorEnabled: !!locals.user!.twoFactorEnabled,
-	mandatory: requiresTwoFactor(locals.user!.role)
+	mandatory: locals.requiresTwoFactor
 });

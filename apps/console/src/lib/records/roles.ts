@@ -12,9 +12,10 @@ export function isSuperadmin(role: string | null | undefined): boolean {
 	return role === 'superadmin';
 }
 
-/** Two-factor auth is mandatory for the superadmin (and, from step 1, organization owners). */
-export function requiresTwoFactor(role: string | null | undefined): boolean {
-	return isSuperadmin(role);
+/** Two-factor auth is mandatory for the superadmin and for any organization owner
+ *  (DECISIONS.md §9). `ownsAnOrganization`: the account is OWNER of at least one organization. */
+export function requiresTwoFactor(role: string | null | undefined, ownsAnOrganization = false): boolean {
+	return isSuperadmin(role) || ownsAnOrganization;
 }
 
 /** Human label of a stored role (an unknown value is shown as is). */

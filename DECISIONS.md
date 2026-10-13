@@ -140,7 +140,7 @@ transite pas par le serveur, contrairement à ShareMoment qui le relaie). Le hub
 | Étape | Contenu |
 |---|---|
 | 0 ✅ | Scaffold du monorepo, Docker (Postgres + MinIO), Better Auth, layout de la console, script d'installation (1er superadmin) |
-| 1 | Organisations, membres et rôles, applications |
+| 1 ✅ | Organisations, membres et rôles, applications |
 | 2 | Dossiers (publics / privés) et fichiers : upload présigné, traitement images / vidéos / PDF, CRUD dans la console, **blocage au quota (1 Go)** |
 | 3 | API publique + clés + CORS + SDK, avec une landing de démo et sa galerie branchée |
 | 4 | Paliers au-delà de 1 Go (5 Go, 20 Go), suivi de la consommation, API interne pour le portail G2 WebDev |
@@ -280,6 +280,33 @@ et par application.
   l'organisation courante — sinon **404** (et non 403, pour ne pas révéler qu'il existe ailleurs) ;
 - plus tard, en défense supplémentaire : Row-Level Security PostgreSQL.
 
-## 14. Questions ouvertes
+## 14. Choix d'implémentation de l'étape 1
+
+💡 **Organisation active stockée dans la session** (`session.activeOrganizationId`), écrite
+uniquement côté serveur après vérification de l'appartenance, et revérifiée à chaque requête par le
+hook (membre retiré, organisation supprimée…). Un membre d'une seule organisation l'a
+automatiquement ; le superadmin choisit « Travailler dans cette organisation » dans la liste.
+
+💡 **Comptes créés sans e-mail** (pas encore de SMTP) : créer une organisation (son propriétaire) ou
+ajouter un membre crée le compte s'il n'existe pas, avec un **mot de passe temporaire affiché une
+seule fois** (14 caractères, sans caractères ambigus). La personne le change dans « Sécurité ».
+Si le compte existe déjà (membre d'une autre organisation), il est simplement ajouté.
+
+💡 **Qui fait quoi** :
+- créer / modifier (nom, offre, forfait) / supprimer une organisation : **superadmin uniquement** ;
+- page Membres (ajouter, changer de rôle, retirer) : **owner** (et superadmin) ;
+- Applications : **visibles par tous les membres**, créées / modifiées / supprimées par l'owner ;
+- une organisation garde **toujours au moins un owner** (il ne peut ni se rétrograder ni être
+  retiré s'il est le dernier).
+
+💡 **Retrait d'un membre** : si son compte n'appartient plus à **aucune** organisation, il est
+**supprimé** (sinon il pourrait encore se connecter sans rien voir). Supprimer une organisation,
+en revanche, **conserve** les comptes de ses membres.
+
+💡 **Origines autorisées** d'une application : schéma + domaine (+ port), sans chemin
+(`https://monsite.fr`, `http://localhost:5173`), barre finale retirée, doublons fusionnés,
+20 maximum.
+
+## 15. Questions ouvertes
 
 Aucune pour l'instant.

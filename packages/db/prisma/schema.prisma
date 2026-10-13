@@ -1,5 +1,5 @@
-// G2 Hub — data model. Multi-tenant: organizations, applications, folders and files arrive in
-// steps 1–2 (see DECISIONS.md). Step 0 only holds the console accounts.
+// G2 Hub — data model. Multi-tenant: every client datum hangs off an Organization and is always
+// queried scoped by it (see DECISIONS.md §13). Folders and files arrive in step 2.
 // Docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -9,6 +9,65 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Tenancy ─────────────────────────────────────────────────────────────────
+
+/// A client of the instance (billed monthly outside the hub). Owns members and applications.
+model Organization {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  /// Storage quota of the plan, in bytes — 1 GB, 5 GB or 20 GB (DECISIONS.md §10).
+  quotaBytes     BigInt   @default(1073741824)
+  /// Offer: false = « Accès » (user management only), true = « Accès + Stockage » (§12).
+  storageEnabled Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships  Membership[]
+  applications Application[]
+  /// Sessions currently working in this organization (cleared if it is deleted).
+  sessions     Session[]
+}
+
+/// A console account's rights inside ONE organization (an account may belong to several).
+enum OrgRole {
+  /// Everything in the organization: members, roles, applications (and keys, files).
+  OWNER
+  /// Create / rename / delete folders and files.
+  EDITOR
+  /// Read and download.
+  VIEWER
+}
+
+model Membership {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/// A client's site / portal / portfolio plugged into the hub (API keys arrive in step 3).
+model Application {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  /// URL-friendly id, unique within the organization.
+  slug           String
+  /// Origins (scheme + host + port) allowed to call the API from a browser — CORS (§3).
+  allowedOrigins String[]     @default([])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
 }
 
 // ─── Authentication (Better Auth) ────────────────────────────────────────────
@@ -29,9 +88,10 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  sessions   Session[]
-  accounts   Account[]
-  twoFactors TwoFactor[]
+  sessions    Session[]
+  accounts    Account[]
+  twoFactors  TwoFactor[]
+  memberships Membership[]
 
   @@map("user")
 }
@@ -60,6 +120,11 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The organization the console is currently working in. Always set server-side after checking
+  /// the membership (never trusted from the browser) — DECISIONS.md §13.
+  activeOrganizationId String?
+  activeOrganization   Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("session")

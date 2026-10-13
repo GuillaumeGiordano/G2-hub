@@ -24,7 +24,8 @@ hub measures usage and enforces quotas.
 and a delivered copy installed on a client's own server (one organization, which they customize).
 Nothing specific to G2 WebDev is hard-coded — instance name, domain, S3, mail come from `.env`.
 
-Status: **step 0 done** (monorepo, console auth with mandatory 2FA, responsive shell). Every
+Status: **step 1 done** (organizations, members & roles, applications, active organization in the
+session, tenant isolation). Every
 validated choice is logged in `DECISIONS.md` (read it first; it is the source of truth for scope,
 architecture and the step-by-step roadmap).
 
@@ -55,9 +56,12 @@ There is no test suite. Verify changes by driving the dev server.
 ## Layout
 
 ```
-apps/console/       SvelteKit: back-office + API. src/hooks.server.ts = central guard (the (app)
-                    group requires a session; superadmin without 2FA → /securite?setup=required).
-                    scripts/install.ts = first superadmin.
+apps/console/       SvelteKit: back-office + API. src/hooks.server.ts = central guard: (app) needs a
+                    session, 2FA is forced for superadmin + owners, (app)/(org) needs an active
+                    organization; it builds `locals.orgContext` (from the SESSION) for services.
+                    Layers: lib/server/{repositories,services,mappers}, lib/viewmodels,
+                    lib/records (labels, roles, the `can()` permission table), lib/schemas (Zod,
+                    shared with the browser via FieldErrors). scripts/install.ts = first superadmin.
 packages/db/        @g2-hub/db — Prisma schema, migrations, generated client (exports the CLASS,
                     the console builds its own singleton in src/lib/server/db.ts).
 packages/sdk/       @g2/hub-client — client applications' SDK (step 3).
@@ -83,8 +87,12 @@ English code, Conventional Commits).
 ## Rules specific to this project
 
 - **Tenant isolation is the first invariant**: every query on tenant data is scoped by
-  organization (and application). Never trust an id coming from a client without checking it
-  belongs to the caller's tenant.
+  organization (and application). Organization-scoped services take an `OrgContext`
+  (`locals.orgContext`, built from the session) — never an organization id from the browser.
+  Writes go through `updateMany`/`deleteMany` filtered on `id` AND `organizationId`; an id from
+  another organization → **404** (not 403, to reveal nothing).
+- **UI = `@guillaumeg/ui` only** (Table, Modal, Input, Select, TagInput, ButtonAction…): read the
+  component source before using a prop. Note: `Pagination`'s `total` is the PAGE count.
 - **Secrets never reach a browser**: secret API keys are server-to-server only and stored hashed.
 - **The API is a contract**: versioned under `/api/v1`; a breaking change = a new version.
 - Record every validated decision in `DECISIONS.md` (date + decision + why) before or with the
