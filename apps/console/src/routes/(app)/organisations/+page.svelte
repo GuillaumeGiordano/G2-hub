@@ -261,7 +261,7 @@
 		{/if}
 
 		{#if !editing}
-			<div class="section-title">Propriétaire</div>
+			<div class="section-title">Admin</div>
 			<Input error={formErrors.get('ownerName')} label="Nom" name="ownerName" required />
 			<Input
 				error={formErrors.get('ownerEmail')}

@@ -14,7 +14,7 @@ declare global {
 			organization: ActiveOrganization | null;
 			/** Ready-made context for organization-scoped services (null without an organization). */
 			orgContext: OrgContext | null;
-			/** Mandatory 2FA applies to this account (superadmin, or owner of an organization). */
+			/** Mandatory 2FA applies to this account (superadmin, or Admin of an organization). */
 			requiresTwoFactor: boolean;
 		}
 	}

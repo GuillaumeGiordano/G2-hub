@@ -71,10 +71,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.orgContext = organization
 			? { userId: actor.id, isSuperadmin: actor.isSuperadmin, organization }
 			: null;
-		event.locals.requiresTwoFactor = requiresTwoFactor(
-			session.user.role,
-			memberships.some((m) => m.role === 'OWNER')
-		);
+		event.locals.requiresTwoFactor = requiresTwoFactor(session.user.role, memberships.length > 0);
 	}
 
 	const routeId = event.route.id ?? '';

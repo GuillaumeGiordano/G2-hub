@@ -10,7 +10,7 @@ import type { FolderBrowser, FolderCrumb } from '$lib/viewmodels/folder';
 
 // Folders of an application of the ACTIVE organization (ctx comes from the session —
 // DECISIONS.md §13). Nested; a subfolder always has its parent's visibility (§7). Readable by every
-// member, written by EDITOR and up. Storage is an option of the offer (§12).
+// member, written by its Admins. Storage is an option of the offer (§12).
 
 /** Throw 403 when the organization did not subscribe to the storage option. */
 export function assertStorageEnabled(ctx: OrgContext) {

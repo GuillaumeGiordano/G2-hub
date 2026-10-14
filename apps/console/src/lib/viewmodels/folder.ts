@@ -20,7 +20,7 @@ export type FolderBrowser = {
 	/** Ancestors of `folder`, root first (excluding `folder` itself). */
 	crumbs: FolderCrumb[];
 	folders: FolderListItem[];
-	/** May create / rename / delete in this application (EDITOR and up). */
+	/** May create / rename / delete in this application (Admins). */
 	canWrite: boolean;
 	/** The organization subscribed to the storage option (« Accès + Stockage »). */
 	storageEnabled: boolean;

@@ -9,8 +9,8 @@ import * as appUserService from '$lib/server/services/appUserService';
 import * as folderService from '$lib/server/services/folderService';
 import type { Actions, PageServerLoad } from './$types';
 
-// Users of one application's portal (DECISIONS.md §24): every member sees them, owners and editors
-// manage them (the service answers 403 to the others).
+// Users of one application's portal (DECISIONS.md §24): managed by the organization's Admins
+// (the service answers 403 to anyone else).
 const idSchema = z.object({ id: requiredString() });
 const disableSchema = z.object({ id: requiredString(), disabled: checkbox() });
 

@@ -55,15 +55,6 @@ export function createMembership(
 	return tx.membership.create({ data, select: { id: true } });
 }
 
-/** Returns the number of rows changed (0 = not in this organization). */
-export async function updateRole(organizationId: string, membershipId: string, role: OrgRole) {
-	const { count } = await prisma.membership.updateMany({
-		where: { id: membershipId, organizationId },
-		data: { role }
-	});
-	return count;
-}
-
 /** Returns the number of rows removed (0 = not in this organization). */
 export async function deleteMembership(
 	organizationId: string,

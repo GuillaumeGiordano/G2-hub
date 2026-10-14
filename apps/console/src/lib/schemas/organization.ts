@@ -18,7 +18,7 @@ const organizationFields = {
 /** Creation: the organization and its first owner. */
 export const organizationCreateSchema = z.object({
 	...organizationFields,
-	ownerName: requiredString('Nom du propriétaire requis'),
+	ownerName: requiredString('Nom de l’admin requis'),
 	ownerEmail: email()
 });
 

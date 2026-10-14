@@ -36,13 +36,10 @@ model Organization {
 }
 
 /// A console account's rights inside ONE organization (an account may belong to several).
+/// Every member is an « Admin » (DECISIONS.md §26); finer roles live in the applications.
 enum OrgRole {
-  /// Everything in the organization: members, roles, applications (and keys, files).
+  /// Everything in the organization: members, applications (and keys, users, files).
   OWNER
-  /// Create / rename / delete folders and files.
-  EDITOR
-  /// Read and download.
-  VIEWER
 }
 
 model Membership {

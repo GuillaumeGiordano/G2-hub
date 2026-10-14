@@ -9,7 +9,8 @@ import type { OrgRole } from '$lib/records/organization';
 import type { AddedMember, MemberListItem } from '$lib/viewmodels/member';
 
 // Members of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13). Managed by
-// its owners (and the superadmin). An organization always keeps at least one owner.
+// its Admins (and the superadmin); every member is an Admin (§26). An organization always keeps
+// at least one.
 
 export async function listMembers(ctx: OrgContext): Promise<MemberListItem[]> {
 	assertCan(ctx, 'members.manage');
@@ -20,7 +21,7 @@ export async function listMembers(ctx: OrgContext): Promise<MemberListItem[]> {
 /** Add someone to the organization; an account is created (temporary password) if needed. */
 export async function addMember(
 	ctx: OrgContext,
-	input: { name: string; email: string; role: OrgRole }
+	input: { name: string; email: string }
 ): Promise<AddedMember> {
 	assertCan(ctx, 'members.manage');
 	const organizationId = ctx.organization.id;
@@ -29,26 +30,16 @@ export async function addMember(
 		if (await membershipRepo.findMembership(organizationId, account.userId)) {
 			throw new HubError('Cette personne est déjà membre de l’organisation.', { field: 'email' });
 		}
-		await membershipRepo.createMembership({ organizationId, userId: account.userId, role: input.role }, tx);
+		await membershipRepo.createMembership({ organizationId, userId: account.userId, role: 'OWNER' }, tx);
 		return { email: input.email, temporaryPassword: account.temporaryPassword };
 	});
 }
 
-/** Refuse to leave the organization without an owner. */
+/** Refuse to leave the organization without an Admin. */
 async function assertKeepsAnOwner(organizationId: string, member: { role: OrgRole }) {
 	if (member.role === 'OWNER' && (await membershipRepo.countOwners(organizationId)) <= 1) {
-		throw new HubError('L’organisation doit garder au moins un propriétaire.');
+		throw new HubError('L’organisation doit garder au moins un admin.');
 	}
-}
-
-export async function changeRole(ctx: OrgContext, membershipId: string, role: OrgRole): Promise<string> {
-	assertCan(ctx, 'members.manage');
-	const organizationId = ctx.organization.id;
-	const member = await membershipRepo.findMemberInOrganization(organizationId, membershipId);
-	if (!member) throw notFound('Membre introuvable.');
-	if (role !== 'OWNER') await assertKeepsAnOwner(organizationId, member);
-	await membershipRepo.updateRole(organizationId, membershipId, role);
-	return member.user.email;
 }
 
 /**

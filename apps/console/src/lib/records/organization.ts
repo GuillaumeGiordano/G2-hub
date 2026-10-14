@@ -1,35 +1,21 @@
 // Organization roles, rights and plans — presentation config + the single permission table.
 // Client-safe (no server import): pages use it to show / hide actions, services to enforce them.
 
-export const ORG_ROLES = ['OWNER', 'EDITOR', 'VIEWER'] as const;
+/** Every console member is an « Admin » of its organization (DECISIONS.md §26): finer roles
+ *  (super user, user, guest) belong to the applications' users, never to the console. */
+export const ORG_ROLES = ['OWNER'] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
 export const orgRoleLabel: Record<OrgRole, string> = {
-	OWNER: 'Propriétaire',
-	EDITOR: 'Éditeur',
-	VIEWER: 'Lecteur'
+	OWNER: 'Admin'
 };
 
-export const orgRoleVariant: Record<OrgRole, 'primary' | 'info' | 'default'> = {
-	OWNER: 'primary',
-	EDITOR: 'info',
-	VIEWER: 'default'
-};
-
-export const orgRoleOptions = ORG_ROLES.map((r) => ({ value: r, label: orgRoleLabel[r] }));
-
-export function isOrgRole(value: unknown): value is OrgRole {
-	return typeof value === 'string' && (ORG_ROLES as readonly string[]).includes(value);
-}
-
-/** What a member may do in its organization (DECISIONS.md §3). The superadmin may do everything.
+/** What a member may do in its organization (DECISIONS.md §3, §26). The superadmin may do everything.
  *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
 export type OrgPermission = 'members.manage' | 'applications.manage' | 'appUsers.manage' | 'files.write' | 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	OWNER: ['members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read'],
-	EDITOR: ['appUsers.manage', 'files.write', 'read'],
-	VIEWER: ['read']
+	OWNER: ['members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
 };
 
 /** `role` null = the superadmin working in an organization it is not a member of. */

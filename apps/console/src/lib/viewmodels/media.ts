@@ -39,7 +39,7 @@ export type MediaLibrary = {
 	page: number;
 	perPage: number;
 	folders: MediaFolderOption[];
-	/** May delete media (EDITOR and up). */
+	/** May delete media (Admins). */
 	canWrite: boolean;
 	storageEnabled: boolean;
 };

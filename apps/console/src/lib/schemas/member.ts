@@ -1,15 +1,10 @@
 import { z } from 'zod';
 import { email, requiredString } from '$lib/validation';
-import { ORG_ROLES } from '$lib/records/organization';
 
-// Member forms (owner) — shared by the server actions and the browser (`FieldErrors`).
-
-const role = z.enum(ORG_ROLES, 'Rôle requis');
+// Member form (Admin) — shared by the server action and the browser (`FieldErrors`). No role:
+// every member is an Admin (DECISIONS.md §26).
 
 export const memberAddSchema = z.object({
 	name: requiredString('Nom requis'),
-	email: email(),
-	role
+	email: email()
 });
-
-export const memberRoleSchema = z.object({ membershipId: requiredString(), role });
