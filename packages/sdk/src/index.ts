@@ -14,7 +14,7 @@
 //   → the visitor's browser PUTs the file to `ticket.uploadUrl` (Content-Type = contentType)
 //   const file = await hub.completeUpload(ticket.fileId);   // store file.id in the site's database
 // or, when the file is already on the server: `await hub.uploadFile({ path, name, contentType, data })`.
-// It also invites the users of its portal (DECISIONS.md §24): `await hub.inviteUser({ name, email })`.
+// It also invites the users of its portal (DECISIONS.md §24): `await hub.inviteUser({ name, email, role })`.
 
 export type HubVisibility = 'PUBLIC' | 'PRIVATE';
 export type HubFileKind = 'IMAGE' | 'VIDEO' | 'PDF';
@@ -78,8 +78,17 @@ export type HubUploadTicket = {
 	expiresInSeconds: number;
 };
 
+/** Role of a portal user, by importance (DECISIONS.md §26) — the portal decides what each may do. */
+export type HubUserRole = 'SUPER_USER' | 'USER' | 'GUEST';
+
 /** A portal user of the application. INVITED until they choose their password. */
-export type HubUser = { id: string; name: string; email: string; status: 'INVITED' | 'ACTIVE' | 'DISABLED' };
+export type HubUser = {
+	id: string;
+	name: string;
+	email: string;
+	role: HubUserRole;
+	status: 'INVITED' | 'ACTIVE' | 'DISABLED';
+};
 
 export type HubFolderListing = { folder: HubFolder | null; folders: HubFolder[] };
 export type HubFileListing = { folder: HubFolder; files: HubFile[] };
@@ -129,8 +138,9 @@ export type HubClient = {
 	/** Delete a file (and free its space). */
 	deleteFile(id: string): Promise<void>;
 	/** Invite someone to the application's portal: the account is created and the invitation
-	 *  e-mailed (link valid 7 days). 400 if the address is already invited / registered. */
-	inviteUser(user: { name: string; email: string }): Promise<HubUser>;
+	 *  e-mailed (link valid 7 days). `role` defaults to USER. 400 if the address is already invited /
+	 *  registered. */
+	inviteUser(user: { name: string; email: string; role?: HubUserRole }): Promise<HubUser>;
 };
 
 const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';

@@ -42,10 +42,30 @@ export function findSsoClient(applicationId: string) {
 	});
 }
 
+/**
+ * The console member `userId` if they are an Admin of the organization owning `applicationId`
+ * (DECISIONS.md §26), else null. Checked at sign-in AND at every later use of a code or token, so
+ * a member removed from the organization loses access to its applications at once.
+ */
+export async function findApplicationAdmin(userId: string, applicationId: string) {
+	const membership = await prisma.membership.findFirst({
+		where: { userId, role: 'OWNER', organization: { applications: { some: { id: applicationId } } } },
+		select: { user: { select: { id: true, name: true, email: true, twoFactorEnabled: true } } }
+	});
+	return membership?.user ?? null;
+}
+
+/** Who a code / token was issued to: exactly one of the two is set (CHECK constraint). */
+const holderSelect = {
+	appUser: { select: { id: true, email: true, name: true, role: true, passwordHash: true, disabledAt: true } },
+	user: { select: { id: true, email: true, name: true } }
+} as const;
+
 export function createAuthCode(data: {
 	hash: string;
 	applicationId: string;
-	appUserId: string;
+	appUserId?: string;
+	userId?: string;
 	redirectUri: string;
 	codeChallenge: string;
 	nonce: string | null;
@@ -69,7 +89,7 @@ export function findAuthCode(hash: string) {
 			authTime: true,
 			expiresAt: true,
 			usedAt: true,
-			appUser: { select: { id: true, email: true, name: true, passwordHash: true, disabledAt: true } }
+			...holderSelect
 		}
 	});
 }
@@ -83,7 +103,8 @@ export async function useAuthCode(id: string): Promise<boolean> {
 export function createAccessToken(data: {
 	hash: string;
 	applicationId: string;
-	appUserId: string;
+	appUserId?: string;
+	userId?: string;
 	scope: string;
 	expiresAt: Date;
 }) {
@@ -97,7 +118,7 @@ export function findAccessToken(hash: string) {
 			applicationId: true,
 			scope: true,
 			expiresAt: true,
-			appUser: { select: { id: true, email: true, name: true, disabledAt: true } }
+			...holderSelect
 		}
 	});
 }

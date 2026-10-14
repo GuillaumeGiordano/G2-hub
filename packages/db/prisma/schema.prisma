@@ -57,23 +57,23 @@ model Membership {
 
 /// A client's site / portal / portfolio plugged into the hub (API keys arrive in step 3).
 model Application {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
   /// URL-friendly id, unique within the organization.
-  slug           String
+  slug            String
   /// Origins (scheme + host + port) allowed to call the API from a browser — CORS (§3).
-  allowedOrigins String[]     @default([])
+  allowedOrigins  String[]     @default([])
   /// « Se connecter avec G2 Hub » (OIDC, DECISIONS.md §25): on when a client secret exists. The
   /// client_id is the application id; only the SHA-256 of the secret is stored.
   ssoSecretHash   String?
   /// First characters of the client secret, to recognize it ("g2_sso_8fK2…").
   ssoSecretPrefix String?
   /// Exact URLs the hub may send a user back to after sign-in (no wildcard).
-  ssoRedirectUris String[]    @default([])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  ssoRedirectUris String[]     @default([])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   folders      Folder[]
   apiKeys      ApiKey[]
@@ -267,14 +267,17 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  sessions    Session[]
-  accounts    Account[]
-  twoFactors  TwoFactor[]
-  memberships Membership[]
-  uploads     StoredFile[]
-  apiKeys     ApiKey[]
+  sessions         Session[]
+  accounts         Account[]
+  twoFactors       TwoFactor[]
+  memberships      Membership[]
+  uploads          StoredFile[]
+  apiKeys          ApiKey[]
   /// Application users this member invited.
-  invitedAppUsers AppUser[]
+  invitedAppUsers  AppUser[]
+  /// « Se connecter avec G2 Hub » as an Admin of the application's organization (§26).
+  oidcAuthCodes    OidcAuthCode[]
+  oidcAccessTokens OidcAccessToken[]
 
   @@map("user")
 }
@@ -347,6 +350,14 @@ model Verification {
 
 // ─── Application users (portal end users) — DECISIONS.md §24 ─────────────────────────────────
 
+/// Roles, by importance: SUPER_USER › USER › GUEST (§26) — sent to the portal in the `role` claim;
+/// the portal decides what each role may do.
+enum AppUserRole {
+  SUPER_USER
+  USER
+  GUEST
+}
+
 /// Someone who signs in to a client's PORTAL (not to the console): an account isolated in ONE
 /// application — the same e-mail may have separate accounts in two applications. Created by
 /// invitation; never able to sign in to the console (separate table from Better Auth's `user`).
@@ -360,6 +371,7 @@ model AppUser {
   /// Lowercased and trimmed.
   email          String
   name           String
+  role           AppUserRole  @default(USER)
   /// scrypt hash (`scrypt$N$r$p$salt$hash`); null until the invitation is accepted.
   passwordHash   String?
   /// Set when disabled by the organization: links and sign-in refused, the account is kept.
@@ -403,13 +415,17 @@ model AppUserToken {
 
 /// A single-use authorization code (60 s), exchanged by the portal's server for tokens. PKCE: the
 /// code is useless without the verifier matching `codeChallenge`. Only its SHA-256 is stored.
+/// Issued to EXACTLY ONE of: an application user, or a console member who is an Admin of the
+/// application's organization (§26) — enforced by a CHECK constraint (see the migration).
 model OidcAuthCode {
   id            String      @id @default(uuid())
   hash          String      @unique
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  appUserId     String
-  appUser       AppUser     @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  appUserId     String?
+  appUser       AppUser?    @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Must be sent again, identical, with the code.
   redirectUri   String
   /// base64url(SHA-256(code_verifier)) — S256 only.
@@ -426,19 +442,23 @@ model OidcAuthCode {
 }
 
 /// An access token (opaque, 1 h) for /oauth/userinfo — and, later, the API on the user's behalf.
-/// Stored hashed, so disabling or deleting the user revokes it at once.
+/// Stored hashed, so disabling or deleting the user revokes it at once. Same holder rule as the
+/// codes: exactly one of `appUserId` / `userId`.
 model OidcAccessToken {
   id            String      @id @default(uuid())
   hash          String      @unique
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  appUserId     String
-  appUser       AppUser     @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  appUserId     String?
+  appUser       AppUser?    @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   scope         String
   expiresAt     DateTime
   createdAt     DateTime    @default(now())
 
   @@index([appUserId])
+  @@index([userId])
   @@index([expiresAt])
 }
 

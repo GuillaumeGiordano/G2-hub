@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Alert, Badge, Button, Card } from '@guillaumeg/ui';
-	import { LogIn, LogOut, Wheat } from '@lucide/svelte';
+	import { LogIn, LogOut, Settings, Wheat } from '@lucide/svelte';
+	import { portalRoleLabel } from '$lib/roles';
 	import type { PageData } from './$types';
 
 	// A client's members area. It never sees a password: « Se connecter avec G2 Hub » sends the
@@ -34,6 +35,8 @@
 			<dl class="facts">
 				<dt>E-mail</dt>
 				<dd>{data.user.email}</dd>
+				<dt>Rôle</dt>
+				<dd><Badge label={portalRoleLabel[data.user.role]} variant={data.user.role === 'admin' ? 'primary' : 'info'} /></dd>
 				<dt>Identifiant G2 Hub (sub)</dt>
 				<dd><code>{data.user.sub}</code></dd>
 				<dt>Connecté le</dt>
@@ -43,6 +46,23 @@
 				<Button type="submit" variant="ghost" icon={LogOut}>Se déconnecter</Button>
 			</form>
 		</Card>
+
+		{#if data.user.role === 'admin'}
+			<!-- Shown only to an Admin of the client's organization (role claim from the hub). A real
+			     portal ALSO checks the role on the server for every admin action. -->
+			<Card>
+				{#snippet header()}
+					<div class="head">
+						<span class="title"><Settings size={16} /> Administration</span>
+						<Badge label="Réservé aux admins" variant="primary" />
+					</div>
+				{/snippet}
+				<p class="muted">
+					Ici, le back-office du site : produits, articles, galerie… Les médias sont stockés dans
+					G2 Hub, les utilisateurs du portail se gèrent dans la console.
+				</p>
+			</Card>
+		{/if}
 	{:else}
 		<Card>
 			<div class="signin">
@@ -102,6 +122,9 @@
 		flex-wrap: wrap;
 	}
 	.title {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		font-weight: 600;
 		color: var(--text-heading);
 	}

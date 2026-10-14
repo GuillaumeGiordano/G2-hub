@@ -1,10 +1,11 @@
-import type { AppUserStatus, PasswordLinkPurpose } from '$lib/records/appUsers';
+import type { AppUserRole, AppUserStatus, PasswordLinkPurpose } from '$lib/records/appUsers';
 
 /** A row of an application's users (console). */
 export type AppUserListItem = {
 	id: string;
 	name: string;
 	email: string;
+	role: AppUserRole;
 	status: AppUserStatus;
 	/** Still invited, and the last invitation link has expired: send it again. */
 	invitationExpired: boolean;

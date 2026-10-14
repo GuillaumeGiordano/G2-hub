@@ -3,6 +3,7 @@ import * as oidc from 'openid-client';
 import { dev } from '$app/environment';
 import { AUTH_COOKIE, hubConfig } from '$lib/server/oidc';
 import { createSession, SESSION_COOKIE } from '$lib/server/sessions';
+import { toPortalRole } from '$lib/roles';
 import type { RequestHandler } from './$types';
 
 // Step 2: back from the hub with a code. The library checks state + iss, exchanges the code (with
@@ -25,9 +26,16 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			idTokenExpected: true
 		});
 		const claims = tokens.claims()!;
-		// The ID token already carries name + email; /userinfo is shown here to exercise the access token.
+		// The ID token already carries name, email and role; /userinfo is called here to exercise the
+		// access token. The role is read from the SIGNED ID token, which openid-client has verified.
 		const info = await oidc.fetchUserInfo(config, tokens.access_token, claims.sub);
-		user = { sub: claims.sub, name: String(info.name ?? ''), email: String(info.email ?? ''), signedInAt: new Date() };
+		user = {
+			sub: claims.sub,
+			name: String(info.name ?? ''),
+			email: String(info.email ?? ''),
+			role: toPortalRole(claims.role),
+			signedInAt: new Date()
+		};
 	} catch (err) {
 		console.error('[portal] sign-in failed', err);
 		redirect(303, `/?erreur=${encodeURIComponent((err as Error).message)}`);

@@ -4,6 +4,7 @@
 	import { Alert, Button, Input, ThemeToggle } from '@guillaumeg/ui';
 	import { Network } from '@lucide/svelte';
 	import { authClient } from '$lib/auth-client';
+	import { safeRedirect } from '$lib/utils/redirect';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -25,8 +26,7 @@
 		}
 		// With 2FA enabled, the twoFactorClient redirects to /2fa (see auth-client.ts).
 		if ((result as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) return;
-		const to = page.url.searchParams.get('redirectTo');
-		goto(to && to.startsWith('/') ? to : '/');
+		goto(safeRedirect(page.url.searchParams.get('redirectTo')));
 	}
 </script>
 

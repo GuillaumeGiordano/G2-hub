@@ -3,7 +3,9 @@ import { randomBytes } from 'node:crypto';
 // The portal's OWN sessions (after « Se connecter avec G2 Hub », the portal keeps the user signed in
 // itself). In memory, for the demo only: a real portal uses its database or a signed cookie.
 
-export type PortalUser = { sub: string; name: string; email: string; signedInAt: Date };
+import type { PortalRole } from '$lib/roles';
+
+export type PortalUser = { sub: string; name: string; email: string; role: PortalRole; signedInAt: Date };
 
 const sessions = new Map<string, PortalUser>();
 

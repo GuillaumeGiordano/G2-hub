@@ -6,6 +6,19 @@ export const SSO_SECRET_PREFIX = 'g2_sso_';
 /** Scopes a portal may ask for: `openid` (required) → sub; `email` → email; `profile` → name. */
 export const SSO_SCOPES = ['openid', 'email', 'profile'] as const;
 
+/** The `role` claim sent to the portal (DECISIONS.md §26): `admin` = an Admin of the application's
+ *  organization (a console member), the others = the application user's role. */
+export const SSO_ROLE_CLAIM = {
+	ADMIN: 'admin',
+	SUPER_USER: 'superuser',
+	USER: 'user',
+	GUEST: 'guest'
+} as const;
+
+/** `sub` of a console member: prefixed so that it never collides with an application user's id
+ *  (those keep their bare id, so the portals already connected do not break). */
+export const MEMBER_SUBJECT_PREFIX = 'm_';
+
 /** Lifetimes, in seconds. */
 export const AUTH_CODE_TTL = 60;
 export const ACCESS_TOKEN_TTL = 3600;

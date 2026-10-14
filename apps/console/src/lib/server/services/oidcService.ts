@@ -5,13 +5,23 @@ import * as userRepo from '$lib/server/repositories/appUserRepository';
 import { hubUrl } from '$lib/server/instance';
 import { signingKey, SIGNING_ALG } from '$lib/server/oidc/keys';
 import { hashPassword, verifyPassword } from '$lib/server/passwords';
-import { ACCESS_TOKEN_TTL, AUTH_CODE_TTL, ID_TOKEN_TTL, SSO_SCOPES } from '$lib/records/sso';
+import {
+	ACCESS_TOKEN_TTL,
+	AUTH_CODE_TTL,
+	ID_TOKEN_TTL,
+	MEMBER_SUBJECT_PREFIX,
+	SSO_ROLE_CLAIM,
+	SSO_SCOPES
+} from '$lib/records/sso';
+import type { AppUserRole } from '$lib/records/appUsers';
 
 // « Se connecter avec G2 Hub » — the OpenID Connect provider (DECISIONS.md §25). Only the
 // Authorization Code flow with PKCE, for portals that have a server (confidential clients):
 //   1. the portal sends the user to /oauth/authorize (client_id = application id, redirect_uri,
 //      state, nonce, code_challenge);
-//   2. the user signs in HERE with their account of THAT application (an AppUser);
+//   2. the user signs in HERE with their account of THAT application (an AppUser) — or, being an
+//      Admin of the application's organization already signed in to the console (2FA done),
+//      continues with that session (§26);
 //   3. the hub sends them back to redirect_uri with a single-use code (60 s);
 //   4. the portal's server exchanges code + code_verifier + client secret at /oauth/token for an
 //      ID token (signed JWT: who the user is) and an access token (for /oauth/userinfo).
@@ -152,21 +162,50 @@ export async function signIn(request: AuthorizeRequest, email: string, password:
 	if (user.disabledAt) return { ok: false, message: 'Ce compte est désactivé. Contactez le responsable du portail.' };
 	failures.delete(key);
 
+	const location = await issueCode(request, { appUserId: user.id }, new Date());
+	await oidcRepo.touchLastLogin(user.id);
+	return { ok: true, location };
+}
+
+/** The console member if they are an Admin of the requesting application's organization, else null. */
+export async function applicationAdmin(request: AuthorizeRequest, userId: string) {
+	const admin = await oidcRepo.findApplicationAdmin(userId, request.application.id);
+	return admin && { name: admin.name, email: admin.email, twoFactorEnabled: admin.twoFactorEnabled };
+}
+
+/**
+ * « Continuer en tant qu'admin »: a console member signed in to the hub (`signedInAt` = when, for
+ * `auth_time`) who is an Admin of the application's organization (§26). Their 2FA must be on —
+ * it is mandatory for every member, and the session then proves it was used.
+ */
+export async function signInAsAdmin(request: AuthorizeRequest, userId: string, signedInAt: Date): Promise<SignInResult> {
+	const admin = await oidcRepo.findApplicationAdmin(userId, request.application.id);
+	if (!admin) return { ok: false, message: "Votre compte n'est pas administrateur de cette application." };
+	if (!admin.twoFactorEnabled) {
+		return { ok: false, message: 'Activez d’abord la double authentification dans la console (page Sécurité).' };
+	}
+	return { ok: true, location: await issueCode(request, { userId: admin.id }, signedInAt) };
+}
+
+/** Store a single-use code for `holder` and return the portal URL carrying it. */
+async function issueCode(
+	request: AuthorizeRequest,
+	holder: { appUserId: string } | { userId: string },
+	authTime: Date
+): Promise<string> {
 	const code = token();
-	const now = Date.now();
 	await oidcRepo.createAuthCode({
 		hash: sha256(code),
 		applicationId: request.application.id,
-		appUserId: user.id,
+		...holder,
 		redirectUri: request.redirectUri,
 		codeChallenge: request.codeChallenge,
 		nonce: request.nonce,
 		scope: request.scope.join(' '),
-		authTime: new Date(now),
-		expiresAt: new Date(now + AUTH_CODE_TTL * 1000)
+		authTime,
+		expiresAt: new Date(Date.now() + AUTH_CODE_TTL * 1000)
 	});
-	await oidcRepo.touchLastLogin(user.id);
-	return { ok: true, location: backTo(request.redirectUri, { code, state: request.state }) };
+	return backTo(request.redirectUri, { code, state: request.state });
 }
 
 // ─── 3. Token endpoint ───────────────────────────────────────────────────────
@@ -225,14 +264,15 @@ export async function exchangeCode(request: Request, form: URLSearchParams): Pro
 	if (!code || code.applicationId !== client.id || code.usedAt || code.expiresAt <= new Date()) throw invalidGrant;
 	if (code.redirectUri !== form.get('redirect_uri')) throw invalidGrant;
 	if (!pkceMatches(form.get('code_verifier') ?? '', code.codeChallenge)) throw invalidGrant;
-	if (code.appUser.disabledAt || !code.appUser.passwordHash) throw invalidGrant;
+	const holder = await activeHolder(code, client.id);
+	if (!holder) throw invalidGrant;
 	if (!(await oidcRepo.useAuthCode(code.id))) throw invalidGrant;
 
 	const accessToken = token('g2_at_');
 	await oidcRepo.createAccessToken({
 		hash: sha256(accessToken),
 		applicationId: client.id,
-		appUserId: code.appUser.id,
+		...holder.ref,
 		scope: code.scope,
 		expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL * 1000)
 	});
@@ -242,11 +282,11 @@ export async function exchangeCode(request: Request, form: URLSearchParams): Pro
 	const idToken = await new SignJWT({
 		auth_time: Math.floor(code.authTime.getTime() / 1000),
 		...(code.nonce && { nonce: code.nonce }),
-		...claimsFor(scopes, code.appUser)
+		...claimsFor(scopes, holder)
 	})
 		.setProtectedHeader({ alg: SIGNING_ALG, kid: key.kid, typ: 'JWT' })
 		.setIssuer(issuer())
-		.setSubject(code.appUser.id)
+		.setSubject(holder.sub)
 		.setAudience(client.id)
 		.setIssuedAt()
 		.setExpirationTime(`${ID_TOKEN_TTL}s`)
@@ -255,12 +295,47 @@ export async function exchangeCode(request: Request, form: URLSearchParams): Pro
 	return { access_token: accessToken, token_type: 'Bearer', expires_in: ACCESS_TOKEN_TTL, id_token: idToken, scope: code.scope };
 }
 
-/** The user's claims the granted scopes allow. Addresses are only ever set by an e-mailed link the
- *  user opened, hence `email_verified`. */
-function claimsFor(scopes: string[], user: { email: string; name: string }) {
+/** Who a code / token was issued to, as the portal sees them. */
+type Holder = {
+	sub: string;
+	email: string;
+	name: string;
+	role: (typeof SSO_ROLE_CLAIM)[keyof typeof SSO_ROLE_CLAIM];
+	/** To issue the access token to the same holder. */
+	ref: { appUserId: string } | { userId: string };
+};
+
+type HolderRow = {
+	appUser: { id: string; email: string; name: string; role: AppUserRole; passwordHash: string | null; disabledAt: Date | null } | null;
+	user: { id: string; email: string; name: string } | null;
+};
+
+/**
+ * The holder of a code / token if they may STILL use it, else null: an application user not
+ * disabled, or a console member still Admin of the application's organization (§26) — removing a
+ * member from the organization thus cuts their access to its applications at once.
+ */
+async function activeHolder(row: HolderRow, applicationId: string): Promise<Holder | null> {
+	if (row.appUser) {
+		const u = row.appUser;
+		if (u.disabledAt || !u.passwordHash) return null;
+		return { sub: u.id, email: u.email, name: u.name, role: SSO_ROLE_CLAIM[u.role], ref: { appUserId: u.id } };
+	}
+	if (row.user && (await oidcRepo.findApplicationAdmin(row.user.id, applicationId))) {
+		const u = row.user;
+		return { sub: MEMBER_SUBJECT_PREFIX + u.id, email: u.email, name: u.name, role: SSO_ROLE_CLAIM.ADMIN, ref: { userId: u.id } };
+	}
+	return null;
+}
+
+/** The holder's claims: `role` always (§26), the others as the granted scopes allow. Application
+ *  users' addresses are only ever set by an e-mailed link they opened, and console accounts are
+ *  created the same way, hence `email_verified`. */
+function claimsFor(scopes: string[], holder: Holder) {
 	return {
-		...(scopes.includes('email') && { email: user.email, email_verified: true }),
-		...(scopes.includes('profile') && { name: user.name })
+		role: holder.role,
+		...(scopes.includes('email') && { email: holder.email, email_verified: true }),
+		...(scopes.includes('profile') && { name: holder.name })
 	};
 }
 
@@ -270,10 +345,9 @@ export async function userInfo(request: Request) {
 	const header = request.headers.get('authorization') ?? '';
 	const value = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
 	const row = value ? await oidcRepo.findAccessToken(sha256(value)) : null;
-	if (!row || row.expiresAt <= new Date() || row.appUser.disabledAt) {
-		throw new OAuthError(401, 'invalid_token', 'The access token is invalid or expired.');
-	}
-	return { sub: row.appUser.id, ...claimsFor(row.scope.split(' '), row.appUser) };
+	const holder = row && row.expiresAt > new Date() ? await activeHolder(row, row.applicationId) : null;
+	if (!row || !holder) throw new OAuthError(401, 'invalid_token', 'The access token is invalid or expired.');
+	return { sub: holder.sub, ...claimsFor(row.scope.split(' '), holder) };
 }
 
 // ─── Discovery ───────────────────────────────────────────────────────────────
@@ -294,7 +368,7 @@ export function discoveryDocument() {
 		id_token_signing_alg_values_supported: [SIGNING_ALG],
 		token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
 		code_challenge_methods_supported: ['S256'],
-		claims_supported: ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'email', 'email_verified', 'name'],
+		claims_supported: ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'role', 'email', 'email_verified', 'name'],
 		authorization_response_iss_parameter_supported: true
 	};
 }

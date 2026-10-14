@@ -4,6 +4,7 @@
 	import { Alert, Button, Input, ThemeToggle } from '@guillaumeg/ui';
 	import { ShieldCheck } from '@lucide/svelte';
 	import { authClient } from '$lib/auth-client';
+	import { safeRedirect } from '$lib/utils/redirect';
 
 	let code = $state('');
 	let error = $state('');
@@ -22,8 +23,7 @@
 			error = useBackup ? 'Code de secours invalide.' : 'Code invalide. Réessayez.';
 			return;
 		}
-		const to = page.url.searchParams.get('redirectTo');
-		goto(to && to.startsWith('/') ? to : '/');
+		goto(safeRedirect(page.url.searchParams.get('redirectTo')));
 	}
 
 	function toggleBackup() {

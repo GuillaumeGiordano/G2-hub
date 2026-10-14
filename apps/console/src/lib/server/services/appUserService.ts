@@ -9,7 +9,12 @@ import { hubUrl } from '$lib/server/instance';
 import { sendMail } from '$lib/server/mail/mailer';
 import { invitationMail, passwordResetMail } from '$lib/server/mail/templates';
 import { hashPassword } from '$lib/server/passwords';
-import { INVITATION_VALID_DAYS, PASSWORD_RESET_VALID_MINUTES, type AppUserStatus } from '$lib/records/appUsers';
+import {
+	INVITATION_VALID_DAYS,
+	PASSWORD_RESET_VALID_MINUTES,
+	type AppUserRole,
+	type AppUserStatus
+} from '$lib/records/appUsers';
 import type { AppUserListItem, PasswordLink } from '$lib/viewmodels/appUser';
 import { applicationOrThrow } from './folderService';
 
@@ -41,13 +46,15 @@ type InviteScope = {
 	invitedById: string | null;
 };
 
-export type InvitedAppUser = { id: string; name: string; email: string; status: AppUserStatus };
+export type InvitedAppUser = { id: string; name: string; email: string; role: AppUserRole; status: AppUserStatus };
+
+type InviteInput = { name: string; email: string; role: AppUserRole };
 
 /**
  * Create the account and e-mail its invitation. Shared by the console and the API. If the e-mail
  * cannot be sent, the account is removed again: an invitation nobody received helps no one.
  */
-export async function invite(scope: InviteScope, input: { name: string; email: string }): Promise<InvitedAppUser> {
+export async function invite(scope: InviteScope, input: InviteInput): Promise<InvitedAppUser> {
 	const email = normalizeEmail(input.email);
 	const existing = await userRepo.findAppUserByEmail(scope.applicationId, email);
 	if (existing) throw alreadyThere(existing.passwordHash !== null);
@@ -62,6 +69,7 @@ export async function invite(scope: InviteScope, input: { name: string; email: s
 					applicationId: scope.applicationId,
 					email,
 					name: input.name,
+					role: input.role,
 					invitedById: scope.invitedById
 				},
 				tx
@@ -86,7 +94,7 @@ export async function invite(scope: InviteScope, input: { name: string; email: s
 		await userRepo.deleteAppUser(scope.organizationId, scope.applicationId, id);
 		throw err;
 	}
-	return { id, name: input.name, email, status: 'INVITED' };
+	return { id, name: input.name, email, role: input.role, status: 'INVITED' };
 }
 
 function alreadyThere(active: boolean) {
@@ -119,7 +127,7 @@ export async function listAppUsers(
 	return { items: rows.map((r) => toAppUserListItem(r, now)), total };
 }
 
-export async function inviteAppUser(ctx: OrgContext, applicationId: string, input: { name: string; email: string }) {
+export async function inviteAppUser(ctx: OrgContext, applicationId: string, input: InviteInput) {
 	assertCan(ctx, 'appUsers.manage');
 	const app = await applicationOrThrow(ctx, applicationId);
 	return invite(
@@ -173,6 +181,23 @@ export async function setAppUserDisabled(
 		await userRepo.revokeTokens(user.id);
 		await userRepo.revokeGrants(user.id);
 	}
+	return user.email;
+}
+
+/** Change the role. Codes and access tokens already issued are revoked: they would otherwise keep
+ *  the former role for up to an hour (the portal then asks the user to sign in again). */
+export async function changeAppUserRole(
+	ctx: OrgContext,
+	applicationId: string,
+	id: string,
+	role: AppUserRole
+): Promise<string> {
+	assertCan(ctx, 'appUsers.manage');
+	await applicationOrThrow(ctx, applicationId);
+	const user = await appUserOrThrow(ctx, applicationId, id);
+	if (user.role === role) return user.email;
+	await userRepo.setRole(ctx.organization.id, applicationId, user.id, role);
+	await userRepo.revokeGrants(user.id);
 	return user.email;
 }
 

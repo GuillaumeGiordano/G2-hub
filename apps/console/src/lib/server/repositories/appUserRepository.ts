@@ -1,4 +1,5 @@
 import type { Prisma } from '@g2-hub/db';
+import type { AppUserRole } from '$lib/records/appUsers';
 import { prisma } from '$lib/server/db';
 
 // Application users (portal end users) and their e-mailed links — Prisma queries only. Console
@@ -34,6 +35,7 @@ export function searchAppUsers(params: {
 		take: params.take,
 		select: {
 			id: true,
+			role: true,
 			name: true,
 			email: true,
 			passwordHash: true,
@@ -60,6 +62,7 @@ const userSelect = {
 	applicationId: true,
 	name: true,
 	email: true,
+	role: true,
 	passwordHash: true,
 	disabledAt: true
 } as const;
@@ -77,7 +80,14 @@ export function findAppUserByEmail(applicationId: string, email: string) {
 }
 
 export function createAppUser(
-	data: { organizationId: string; applicationId: string; email: string; name: string; invitedById: string | null },
+	data: {
+		organizationId: string;
+		applicationId: string;
+		email: string;
+		name: string;
+		role: AppUserRole;
+		invitedById: string | null;
+	},
 	tx: Prisma.TransactionClient = prisma
 ) {
 	return tx.appUser.create({ data, select: { id: true } });
@@ -92,7 +102,13 @@ export async function setDisabled(organizationId: string, applicationId: string,
 	return count;
 }
 
-/** A disabled user's sign-in codes and access tokens stop working at once. */
+/** Returns the number of rows changed (0 = not in this organization / application). */
+export async function setRole(organizationId: string, applicationId: string, id: string, role: AppUserRole) {
+	const { count } = await prisma.appUser.updateMany({ where: { id, organizationId, applicationId }, data: { role } });
+	return count;
+}
+
+/** A disabled user's (or a user whose role changed) sign-in codes and access tokens stop working at once. */
 export async function revokeGrants(appUserId: string) {
 	await prisma.$transaction([
 		prisma.oidcAuthCode.deleteMany({ where: { appUserId } }),

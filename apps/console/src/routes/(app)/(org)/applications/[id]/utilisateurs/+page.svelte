@@ -14,15 +14,24 @@
 		Modal,
 		Pagination,
 		SearchFilters,
+		Select,
 		Table
 	} from '@guillaumeg/ui';
-	import { EllipsisVertical, Send, Trash2, UserCheck, UserPlus, Users, UserX } from '@lucide/svelte';
+	import { EllipsisVertical, Send, Trash2, UserCheck, UserCog, UserPlus, Users, UserX } from '@lucide/svelte';
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { PER_PAGE_OPTIONS } from '$lib/constants';
-	import { appUserStatusLabel, appUserStatusVariant, INVITATION_VALID_DAYS } from '$lib/records/appUsers';
+	import {
+		appUserRoleLabel,
+		appUserRoleOptions,
+		appUserRoleVariant,
+		appUserStatusLabel,
+		appUserStatusVariant,
+		DEFAULT_APP_USER_ROLE,
+		INVITATION_VALID_DAYS
+	} from '$lib/records/appUsers';
 	import { applicationTabs } from '$lib/records/navigation';
-	import { appUserInviteSchema } from '$lib/schemas/appUser';
+	import { appUserInviteSchema, appUserRoleSchema } from '$lib/schemas/appUser';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
 	import type { AppUserListItem } from '$lib/viewmodels/appUser';
@@ -41,13 +50,17 @@
 	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 
 	const INVITE_MODAL_ID = 'app-user-invite';
+	const ROLE_MODAL_ID = 'app-user-role';
 	const DELETE_MODAL_ID = 'app-user-delete';
 
 	let busy = $state(false);
 	const setBusy = (v: boolean) => (busy = v);
 
-	const inviteErrors = new FieldErrors(['name', 'email'], appUserInviteSchema);
+	const inviteErrors = new FieldErrors(['name', 'email', 'role'], appUserInviteSchema);
+	let inviteRole = $state<string>(DEFAULT_APP_USER_ROLE);
 	let target = $state<AppUserListItem | null>(null);
+	let newRole = $state<string>(DEFAULT_APP_USER_ROLE);
+	const roleErrors = new FieldErrors(['role'], appUserRoleSchema);
 
 	// « Renvoyer l'invitation » and « Désactiver / Réactiver » submit one hidden form each.
 	let resendForm: HTMLFormElement | undefined = $state();
@@ -72,8 +85,16 @@
 	}
 
 	function openInvite() {
+		inviteRole = DEFAULT_APP_USER_ROLE;
 		inviteErrors.clear();
 		modal(INVITE_MODAL_ID)?.showModal();
+	}
+
+	function openRole(user: AppUserListItem) {
+		target = user;
+		newRole = user.role;
+		roleErrors.clear();
+		modal(ROLE_MODAL_ID)?.showModal();
 	}
 
 	function openDelete(user: AppUserListItem) {
@@ -100,6 +121,10 @@
 	<div class="email">{user.email}</div>
 {/snippet}
 
+{#snippet roleCell(user: AppUserListItem)}
+	<Badge label={appUserRoleLabel[user.role]} variant={appUserRoleVariant[user.role]} />
+{/snippet}
+
 {#snippet statusCell(user: AppUserListItem)}
 	<div class="badges">
 		<Badge label={appUserStatusLabel[user.status]} variant={appUserStatusVariant[user.status]} />
@@ -116,6 +141,14 @@
 		{#if data.canManage}
 			<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
 				{#snippet items(close)}
+					<ButtonActionItem
+						label="Changer le rôle"
+						icon={UserCog}
+						onclick={() => {
+							openRole(user);
+							close();
+						}}
+					/>
 					{#if user.status === 'INVITED'}
 						<ButtonActionItem
 							label="Renvoyer l'invitation"
@@ -191,6 +224,7 @@
 			emptyLabel="Aucun utilisateur trouvé."
 			columns={[
 				{ key: 'name', label: 'Utilisateur', cell: nameCell },
+				{ key: 'role', label: 'Rôle', cell: roleCell },
 				{ key: 'status', label: 'État', cell: statusCell },
 				{ key: 'lastLoginAt', label: 'Dernière connexion', cell: lastLoginCell },
 				{ key: 'id', label: '', align: 'right', cell: actionsCell }
@@ -257,8 +291,38 @@
 			required
 			hint={`Un e-mail lui permet de choisir son mot de passe (lien valable ${INVITATION_VALID_DAYS} jours).`}
 		/>
+		<Select
+			bind:value={inviteRole}
+			error={inviteErrors.get('role')}
+			label="Rôle"
+			name="role"
+			options={appUserRoleOptions}
+			hint="Transmis au portail, qui décide de ce que chaque rôle peut faire."
+		/>
 		<div class="form-submit">
 			<Button type="submit" icon={Send} loading={busy}>Envoyer l'invitation</Button>
+		</div>
+	</form>
+</Modal>
+
+<Modal id={ROLE_MODAL_ID} title="Changer le rôle">
+	<form
+		method="POST"
+		action="?/role"
+		class="form"
+		use:enhance={toastEnhance({
+			success: 'Rôle mis à jour.',
+			onSuccess: () => modal(ROLE_MODAL_ID)?.close(),
+			setBusy,
+			fields: roleErrors
+		})}
+	>
+		<p class="confirm-text">{target?.name} — {target?.email}</p>
+		<input type="hidden" name="id" value={target?.id} />
+		<Select bind:value={newRole} error={roleErrors.get('role')} label="Rôle" name="role" options={appUserRoleOptions} />
+		<p class="hint">S'il est connecté au portail, il devra se reconnecter pour recevoir son nouveau rôle.</p>
+		<div class="form-submit">
+			<Button type="submit" loading={busy}>Enregistrer</Button>
 		</div>
 	</form>
 </Modal>
@@ -298,5 +362,10 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.hint {
+		font-size: 13px;
+		color: var(--text-muted);
+		margin: 0;
 	}
 </style>

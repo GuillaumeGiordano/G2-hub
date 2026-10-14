@@ -16,6 +16,27 @@ export const appUserStatusVariant: Record<AppUserStatus, 'info' | 'success' | 'd
 	DISABLED: 'default'
 };
 
+/** Roles of an application user, by importance (DECISIONS.md §26). The portal receives them in the
+ *  `role` claim and decides what each may do. */
+export const APP_USER_ROLES = ['SUPER_USER', 'USER', 'GUEST'] as const;
+export type AppUserRole = (typeof APP_USER_ROLES)[number];
+export const DEFAULT_APP_USER_ROLE: AppUserRole = 'USER';
+
+export const appUserRoleLabel: Record<AppUserRole, string> = {
+	SUPER_USER: 'Super utilisateur',
+	USER: 'Utilisateur',
+	// Not « Invité »: that is already the status of an account whose invitation is pending.
+	GUEST: 'Visiteur'
+};
+
+export const appUserRoleVariant: Record<AppUserRole, 'primary' | 'info' | 'default'> = {
+	SUPER_USER: 'primary',
+	USER: 'info',
+	GUEST: 'default'
+};
+
+export const appUserRoleOptions = APP_USER_ROLES.map((r) => ({ value: r, label: appUserRoleLabel[r] }));
+
 /** How long the e-mailed links stay valid. */
 export const INVITATION_VALID_DAYS = 7;
 export const PASSWORD_RESET_VALID_MINUTES = 60;
