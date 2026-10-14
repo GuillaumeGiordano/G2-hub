@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ url, locals, setHeaders }) => {
 		'x-frame-options': 'DENY',
 		'content-security-policy': "frame-ancestors 'none'",
 		'cache-control': 'no-store',
-		'referrer-policy': 'no-referrer'
+		'referrer-policy': 'same-origin'
 	});
 	const check = await checkAuthorizeRequest(url.searchParams);
 	if (check.kind === 'redirect') redirect(303, check.location);

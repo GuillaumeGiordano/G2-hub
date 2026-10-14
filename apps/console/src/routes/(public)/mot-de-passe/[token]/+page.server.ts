@@ -10,7 +10,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	// The token is in the URL: never send it to another site in a Referer header.
-	setHeaders({ 'referrer-policy': 'no-referrer', 'cache-control': 'no-store' });
+	setHeaders({ 'referrer-policy': 'same-origin', 'cache-control': 'no-store' });
 	return { link: await appUserService.passwordLink(params.token) };
 };
 
