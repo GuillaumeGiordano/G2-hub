@@ -16,9 +16,10 @@ export async function overview(ctx: OrgContext): Promise<StorageOverview> {
 	assertCan(ctx, 'read');
 	assertStorageEnabled(ctx);
 	const organizationId = ctx.organization.id;
-	const [rows, applications] = await Promise.all([
+	const [rows, applications, personal] = await Promise.all([
 		fileRepo.usageBreakdown(organizationId),
-		applicationRepo.listApplications(organizationId)
+		applicationRepo.listApplications(organizationId),
+		fileRepo.personalUsage(organizationId)
 	]);
 
 	const usedBytes = rows.reduce((sum, r) => sum + Number(r.bytes), 0);
@@ -39,6 +40,7 @@ export async function overview(ctx: OrgContext): Promise<StorageOverview> {
 			.map((a) => ({ id: a.id, name: a.name, ...sum((r) => r.applicationId === a.id) }))
 			.sort((a, b) => b.bytes - a.bytes),
 		byKind: FILE_KINDS.map((kind) => ({ kind, ...sum((r) => r.kind === kind) })),
+		personal: { bytes: Number(personal.bytes), files: personal.files },
 		upgradeUrl: upgradeUrl()
 	};
 }

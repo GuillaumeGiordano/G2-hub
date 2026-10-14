@@ -23,6 +23,7 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
+		"@g2/hub-client": "workspace:*",
 		"@guillaumeg/ui": "github:GuillaumeGiordano/my-components",
 		"@lucide/svelte": "^1.22.0",
 		"openid-client": "^6.8.8"

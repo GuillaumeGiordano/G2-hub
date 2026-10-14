@@ -61,7 +61,8 @@ export async function resolveFolder(
 	const path = target.path?.split('/').map((s) => s.trim()).filter(Boolean) ?? [];
 	if (id) {
 		const f = await folderRepo.findFolder(ctx.organizationId, id);
-		if (!f || f.applicationId !== ctx.applicationId || !canSee(ctx, f.visibility)) {
+		// A user's personal space (§28) is only reached through /api/v1/me: 404 here.
+		if (!f || f.applicationId !== ctx.applicationId || f.ownerAppUserId || !canSee(ctx, f.visibility)) {
 			throw new ApiError(404, 'Dossier introuvable.');
 		}
 		return { id: f.id, name: f.name, path: await pathOf(ctx, f), visibility: f.visibility };

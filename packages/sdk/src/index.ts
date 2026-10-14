@@ -15,6 +15,13 @@
 //   const file = await hub.completeUpload(ticket.fileId);   // store file.id in the site's database
 // or, when the file is already on the server: `await hub.uploadFile({ path, name, contentType, data })`.
 // It also invites the users of its portal (DECISIONS.md §24): `await hub.inviteUser({ name, email, role })`.
+//
+// A PORTAL's server reaches the personal space of the user signed in with « Se connecter avec G2 Hub »
+// (DECISIONS.md §28) — secret key + that user's access token, both checked by the hub:
+//   const me = hub.asUser(session.accessToken);
+//   const avatar = await me.uploadFile({ space: 'public', name, contentType, data });
+//   const { files } = await me.files('private');
+// The token lasts one hour: a 401 means « sign the user in again ».
 
 export type HubVisibility = 'PUBLIC' | 'PRIVATE';
 export type HubFileKind = 'IMAGE' | 'VIDEO' | 'PDF';
@@ -96,6 +103,28 @@ export type HubUser = {
 	status: 'INVITED' | 'ACTIVE' | 'DISABLED';
 };
 
+/** A user's personal space: « public » (public bucket: avatar…) or « private » (signed links). */
+export type HubSpace = 'public' | 'private';
+
+export type HubPersonalUploadRequest = Omit<HubUploadRequest, 'path' | 'folder'> & { space: HubSpace };
+
+/** The personal space of ONE signed-in portal user (secret key + their access token). Every file of
+ *  another user is answered 404. */
+export type HubUserSpace = {
+	/** READY files of the space, newest first (private ones with 10-minute signed links). */
+	files(space: HubSpace): Promise<{ space: HubSpace; files: HubFile[] }>;
+	/** One of the user's files by id. */
+	file(id: string): Promise<HubFile>;
+	/** Reserve an upload in the space (created on first use); the quota is the organization's. */
+	createUpload(request: HubPersonalUploadRequest): Promise<HubUploadTicket>;
+	/** The file was PUT: process it. */
+	completeUpload(fileId: string): Promise<HubFile>;
+	/** Ticket + PUT + completion in one go, for a file already on the server. */
+	uploadFile(request: Omit<HubPersonalUploadRequest, 'size'> & { data: Blob | ArrayBuffer | Uint8Array }): Promise<HubFile>;
+	updateFile(id: string, text: { alt?: string | null; caption?: string | null }): Promise<HubFile>;
+	deleteFile(id: string): Promise<void>;
+};
+
 export type HubFolderListing = { folder: HubFolder | null; folders: HubFolder[] };
 export type HubFileListing = { folder: HubFolder; files: HubFile[] };
 
@@ -156,7 +185,13 @@ export type HubClient = {
 	 *  e-mailed (link valid 7 days). `role` defaults to USER. 400 if the address is already invited /
 	 *  registered. */
 	inviteUser(user: { name: string; email: string; role?: HubUserRole }): Promise<HubUser>;
+	/** The personal space of the user this access token was issued to (« Se connecter avec G2 Hub »,
+	 *  same application). */
+	asUser(accessToken: string): HubUserSpace;
 };
+
+/** The header carrying the signed-in user's access token (personal spaces). */
+const USER_TOKEN_HEADER = 'x-g2-user-token';
 
 const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -170,37 +205,53 @@ export function createHubClient(options: HubClientOptions): HubClient {
 	/** Last good answer per request, served when the hub is unreachable. */
 	const lastGood = new Map<string, unknown>();
 
-	async function get<T>(endpoint: string, params: Record<string, string | undefined> = {}): Promise<T> {
+	/** `userToken`: a personal-space read — never served stale (the cache is not per user). */
+	async function get<T>(endpoint: string, params: Record<string, string | undefined> = {}, userToken?: string): Promise<T> {
 		const url = new URL(`/api/v1/${endpoint}`, baseUrl);
 		for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v);
 		const cacheKey = url.toString(); // without the key
 		if (!secret) url.searchParams.set('key', key);
+		const stale = serveStaleOnError && !userToken;
 
 		let res: Response;
 		try {
-			res = await fetchImpl(url, { headers: secret ? { authorization: `Bearer ${key}` } : {} });
+			res = await fetchImpl(url, {
+				headers: {
+					...(secret ? { authorization: `Bearer ${key}` } : {}),
+					...(userToken ? { [USER_TOKEN_HEADER]: userToken } : {})
+				}
+			});
 		} catch {
-			if (serveStaleOnError && lastGood.has(cacheKey)) return lastGood.get(cacheKey) as T;
+			if (stale && lastGood.has(cacheKey)) return lastGood.get(cacheKey) as T;
 			throw new HubError(0, 'Hub injoignable.');
 		}
 		const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
 		if (!res.ok) {
 			// A 4xx is an answer (wrong key, folder deleted…): never hidden behind stale data.
-			if (res.status >= 500 && serveStaleOnError && lastGood.has(cacheKey)) return lastGood.get(cacheKey) as T;
+			if (res.status >= 500 && stale && lastGood.has(cacheKey)) return lastGood.get(cacheKey) as T;
 			throw new HubError(res.status, body?.error?.message ?? res.statusText);
 		}
-		lastGood.set(cacheKey, body);
+		if (!userToken) lastGood.set(cacheKey, body);
 		return body as T;
 	}
 
 	/** A write (secret key only): no stale fallback — a write must really happen or fail. */
-	async function send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', endpoint: string, body?: unknown): Promise<T> {
+	async function send<T>(
+		method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+		endpoint: string,
+		body?: unknown,
+		userToken?: string
+	): Promise<T> {
 		if (!secret) throw new HubError(403, 'Opération réservée à une clé secrète (côté serveur).');
 		let res: Response;
 		try {
 			res = await fetchImpl(new URL(`/api/v1/${endpoint}`, baseUrl), {
 				method,
-				headers: { authorization: `Bearer ${key}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+				headers: {
+					authorization: `Bearer ${key}`,
+					...(userToken ? { [USER_TOKEN_HEADER]: userToken } : {}),
+					...(body ? { 'content-type': 'application/json' } : {})
+				},
 				body: body ? JSON.stringify(body) : undefined
 			});
 		} catch {
@@ -225,14 +276,9 @@ export function createHubClient(options: HubClientOptions): HubClient {
 		createUpload: (request) => send<HubUploadTicket>('POST', 'uploads', request),
 		completeUpload: (fileId) => send<HubFile>('POST', `uploads/${encodeURIComponent(fileId)}/complete`),
 		async uploadFile({ data, ...request }) {
-			const bytes = data instanceof Blob ? data : new Blob([data as BlobPart]);
+			const bytes = toBlob(data);
 			const ticket = await client.createUpload({ ...request, size: bytes.size } as HubUploadRequest);
-			const put = await fetchImpl(ticket.uploadUrl, {
-				method: 'PUT',
-				headers: { 'content-type': ticket.contentType },
-				body: bytes
-			});
-			if (!put.ok) throw new HubError(put.status, `Envoi refusé par le stockage (${put.status}).`);
+			await putBytes(ticket, bytes);
 			return client.completeUpload(ticket.fileId);
 		},
 		updateFile: (id, text) => send<HubFile>('PATCH', `files/${encodeURIComponent(id)}`, text),
@@ -241,8 +287,42 @@ export function createHubClient(options: HubClientOptions): HubClient {
 		},
 		pinFile: (id, ref) => send<HubFile>('PUT', `files/${encodeURIComponent(id)}/pins/${encodeURIComponent(ref)}`),
 		unpinFile: (id, ref) => send<HubFile>('DELETE', `files/${encodeURIComponent(id)}/pins/${encodeURIComponent(ref)}`),
-		inviteUser: (user) => send<HubUser>('POST', 'users', user)
+		inviteUser: (user) => send<HubUser>('POST', 'users', user),
+		asUser(accessToken) {
+			if (!secret) throw new HubError(403, 'Opération réservée à une clé secrète (côté serveur).');
+			const t = accessToken;
+			const space: HubUserSpace = {
+				files: (s) => get<{ space: HubSpace; files: HubFile[] }>('me/files', { space: s }, t),
+				file: (id) => get<HubFile>(`files/${encodeURIComponent(id)}`, {}, t),
+				createUpload: (request) => send<HubUploadTicket>('POST', 'me/uploads', request, t),
+				completeUpload: (fileId) => send<HubFile>('POST', `uploads/${encodeURIComponent(fileId)}/complete`, undefined, t),
+				async uploadFile({ data, ...request }) {
+					const bytes = toBlob(data);
+					const ticket = await space.createUpload({ ...request, size: bytes.size });
+					await putBytes(ticket, bytes);
+					return space.completeUpload(ticket.fileId);
+				},
+				updateFile: (id, text) => send<HubFile>('PATCH', `files/${encodeURIComponent(id)}`, text, t),
+				deleteFile: async (id) => {
+					await send<{ deleted: true }>('DELETE', `files/${encodeURIComponent(id)}`, undefined, t);
+				}
+			};
+			return space;
+		}
 	};
+
+	const toBlob = (data: Blob | ArrayBuffer | Uint8Array) => (data instanceof Blob ? data : new Blob([data as BlobPart]));
+
+	/** PUT the bytes to the ticket's signed URL (straight to storage, no key involved). */
+	async function putBytes(ticket: HubUploadTicket, bytes: Blob) {
+		const put = await fetchImpl(ticket.uploadUrl, {
+			method: 'PUT',
+			headers: { 'content-type': ticket.contentType },
+			body: bytes
+		});
+		if (!put.ok) throw new HubError(put.status, `Envoi refusé par le stockage (${put.status}).`);
+	}
+
 	return client;
 }
 

@@ -7,13 +7,19 @@ import type { PortalRole } from '$lib/roles';
 
 export type PortalUser = { sub: string; name: string; email: string; role: PortalRole; signedInAt: Date };
 
-const sessions = new Map<string, PortalUser>();
+/** The hub's access token of the user: with the secret key, it opens THEIR personal space
+ *  (DECISIONS.md §28). Server-side only — never sent to the browser. Valid one hour. */
+export type HubToken = { accessToken: string; expiresAt: Date };
+
+type Session = { user: PortalUser; hubToken: HubToken };
+
+const sessions = new Map<string, Session>();
 
 export const SESSION_COOKIE = 'portal_session';
 
-export function createSession(user: PortalUser): string {
+export function createSession(session: Session): string {
 	const id = randomBytes(32).toString('base64url');
-	sessions.set(id, user);
+	sessions.set(id, session);
 	return id;
 }
 

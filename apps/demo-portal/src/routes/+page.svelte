@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Alert, Badge, Button, Card } from '@guillaumeg/ui';
-	import { LogIn, LogOut, Settings, Wheat } from '@lucide/svelte';
+	import { LogIn, LogOut, Settings, UserRound, Wheat } from '@lucide/svelte';
 	import { portalRoleLabel } from '$lib/roles';
 	import type { PageData } from './$types';
 
@@ -43,6 +43,7 @@
 				<dd>{dateFormat.format(data.user.signedInAt)}</dd>
 			</dl>
 			<form method="POST" action="/auth/logout" class="actions">
+				<Button href="/profil" variant="secondary" icon={UserRound}>Mon profil</Button>
 				<Button type="submit" variant="ghost" icon={LogOut}>Se déconnecter</Button>
 			</form>
 		</Card>
@@ -145,6 +146,7 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+		gap: 8px;
 	}
 	.signin {
 		display: flex;

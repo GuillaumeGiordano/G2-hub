@@ -11,6 +11,9 @@ export type AppUserListItem = {
 	invitationExpired: boolean;
 	lastLoginAt: Date | null;
 	createdAt: Date;
+	/** What their personal space holds (§28) — its content is never shown in the console. */
+	personalBytes: number;
+	personalFiles: number;
 };
 
 /** What the « choose a password » page shows about a valid e-mailed link. */

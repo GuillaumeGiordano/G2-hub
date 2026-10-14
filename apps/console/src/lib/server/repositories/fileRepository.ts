@@ -14,6 +14,7 @@ const fileSelect = {
 	kind: true,
 	status: true,
 	visibility: true,
+	ownerAppUserId: true,
 	storagePrefix: true,
 	originalKey: true,
 	variants: true,
@@ -54,6 +55,8 @@ function mediaWhere(
 		organizationId,
 		applicationId,
 		status: 'READY',
+		// The users' personal files are never part of the site's library (§28).
+		ownerAppUserId: null,
 		...(filter.kind ? { kind: filter.kind } : {}),
 		...(filter.folderIds ? { folderId: { in: filter.folderIds } } : {}),
 		...(filter.visibility ? { visibility: filter.visibility } : {}),
@@ -79,7 +82,7 @@ export function searchMedia(
 /** One READY file of the application's library, or null. */
 export function findMediaById(organizationId: string, applicationId: string, id: string) {
 	return prisma.storedFile.findFirst({
-		where: { id, organizationId, applicationId, status: 'READY' },
+		where: { id, organizationId, applicationId, status: 'READY', ownerAppUserId: null },
 		select: { ...fileSelect, folder: { select: { name: true } } }
 	});
 }
@@ -133,6 +136,14 @@ export function listFilesInFolders(organizationId: string, folderIds: string[]) 
 	});
 }
 
+/** Every file of a user's personal space (to purge their objects before deleting the user, §28). */
+export function listOwnedFilesForPurge(organizationId: string, appUserId: string) {
+	return prisma.storedFile.findMany({
+		where: { organizationId, ownerAppUserId: appUserId },
+		select: { visibility: true, originalKey: true, variants: true }
+	});
+}
+
 /** Every file of an application, or of a whole organization (`applicationId` omitted) — to purge
  *  their objects before deleting it. */
 export function listFilesForPurge(organizationId: string, applicationId?: string) {
@@ -173,6 +184,31 @@ export async function usageBreakdown(organizationId: string) {
 	}));
 }
 
+/** What the users' personal spaces hold, all applications together (the « Stockage » page). */
+export async function personalUsage(organizationId: string) {
+	const agg = await prisma.storedFile.aggregate({
+		where: { organizationId, ownerAppUserId: { not: null } },
+		_sum: { bytes: true },
+		_count: { _all: true }
+	});
+	return { bytes: agg._sum.bytes ?? 0n, files: agg._count._all };
+}
+
+/** What each of these users stores in their personal space (the « Utilisateurs » tab). */
+export async function personalUsageByUser(
+	organizationId: string,
+	appUserIds: string[]
+): Promise<Map<string, { bytes: bigint; files: number }>> {
+	if (appUserIds.length === 0) return new Map();
+	const rows = await prisma.storedFile.groupBy({
+		by: ['ownerAppUserId'],
+		where: { organizationId, ownerAppUserId: { in: appUserIds } },
+		_sum: { bytes: true },
+		_count: { _all: true }
+	});
+	return new Map(rows.map((r) => [r.ownerAppUserId!, { bytes: r._sum.bytes ?? 0n, files: r._count._all }]));
+}
+
 /** Bytes counted toward the quota for each of these organizations (lists, internal API). */
 export async function usedBytesByOrganization(organizationIds: string[]): Promise<Map<string, bigint>> {
 	if (organizationIds.length === 0) return new Map();
@@ -194,6 +230,7 @@ export function createUploadingFile(
 		name: string;
 		kind: FileKind;
 		visibility: Visibility;
+		ownerAppUserId: string | null;
 		storagePrefix: string;
 		originalKey: string;
 		bytes: bigint;

@@ -88,6 +88,12 @@
 			{ key: 'percent', label: 'Part', align: 'right', cell: shareCell }
 		]}
 	/>
+	{#if s.personal.files > 0}
+		<p class="muted small">
+			Dont {formatBytes(s.personal.bytes)} ({filesLabel(s.personal.files)}) dans les espaces personnels des
+			utilisateurs des portails.
+		</p>
+	{/if}
 
 	<h2>Par type de fichier</h2>
 	<Table

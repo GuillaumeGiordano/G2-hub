@@ -25,10 +25,11 @@ export async function applicationOrThrow(ctx: OrgContext, applicationId: string)
 	return app;
 }
 
-/** A folder of THIS application of THIS organization, or 404. */
+/** A folder of THIS application of THIS organization, or 404 — a user's personal space (§28)
+ *  included: the console never opens one. */
 export async function folderOrThrow(ctx: OrgContext, applicationId: string, folderId: string) {
 	const folder = await folderRepo.findFolder(ctx.organization.id, folderId);
-	if (!folder || folder.applicationId !== applicationId) throw notFound('Dossier introuvable.');
+	if (!folder || folder.applicationId !== applicationId || folder.ownerAppUserId) throw notFound('Dossier introuvable.');
 	return folder;
 }
 

@@ -132,6 +132,9 @@ importers:
 
   apps/demo-portal:
     dependencies:
+      '@g2/hub-client':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@guillaumeg/ui':
         specifier: github:GuillaumeGiordano/my-components
         version: https://codeload.github.com/GuillaumeGiordano/my-components/tar.gz/d566b5e56ef7c34939ee8f1cee6b7e405f838fae(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.105.1)(sass@1.105.1)(tsx@4.23.15)))(svelte@5.57.2)

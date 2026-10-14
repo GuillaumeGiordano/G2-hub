@@ -109,10 +109,16 @@ model Folder {
   files          StoredFile[]
   name           String
   visibility     Visibility
+  /// Set = the personal space of this application user (DECISIONS.md §28): one PUBLIC and one
+  /// PRIVATE root per user (partial unique index, see the migration), created on first use, kept
+  /// out of the site's tree (console, /folders, /media). Its files are purged with the user.
+  ownerAppUserId String?
+  ownerAppUser   AppUser?     @relation(fields: [ownerAppUserId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId, applicationId, parentId])
+  @@index([ownerAppUserId])
 }
 
 /// Where a file was uploaded from (DECISIONS.md §22). A file sent by a client SITE (through the API)
@@ -163,6 +169,10 @@ model StoredFile {
   status         FileStatus   @default(UPLOADING)
   /// The bucket the processed versions live in — copied from the folder at upload (§7).
   visibility     Visibility
+  /// The application user whose personal space holds the file — copied from the folder at upload
+  /// (§28). null = a file of the site.
+  ownerAppUserId String?
+  ownerAppUser   AppUser?     @relation(fields: [ownerAppUserId], references: [id], onDelete: Cascade)
   /// Object key prefix of the processed versions: `orgs/{org}/apps/{app}/files/{id}/`.
   storagePrefix  String
   /// Temporary key of the uploaded original (private bucket), null once processed.
@@ -185,6 +195,7 @@ model StoredFile {
 
   @@index([organizationId, folderId])
   @@index([organizationId, status])
+  @@index([ownerAppUserId])
 }
 
 /// A site uses this file (e.g. in a product card): while at least one pin exists, the file cannot
@@ -398,6 +409,8 @@ model AppUser {
   updatedAt      DateTime     @updatedAt
 
   tokens       AppUserToken[]
+  folders      Folder[]
+  files        StoredFile[]
   authCodes    OidcAuthCode[]
   accessTokens OidcAccessToken[]
 

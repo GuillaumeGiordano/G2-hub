@@ -350,6 +350,17 @@ export async function userInfo(request: Request) {
 	return { sub: holder.sub, ...claimsFor(row.scope.split(' '), holder) };
 }
 
+/** The application user an access token was issued to, for THIS application — the second proof
+ *  of the personal-space routes (§28), next to the secret key. null when the token is unknown,
+ *  expired, issued to another application, to an Admin (no personal space) or to a disabled user. */
+export async function appUserOfAccessToken(token: string, applicationId: string): Promise<string | null> {
+	if (!token || token.length > 256) return null;
+	const row = await oidcRepo.findAccessToken(sha256(token));
+	if (!row || row.expiresAt <= new Date() || row.applicationId !== applicationId || !row.appUser) return null;
+	const holder = await activeHolder(row, applicationId);
+	return holder && 'appUserId' in holder.ref ? holder.ref.appUserId : null;
+}
+
 // ─── Discovery ───────────────────────────────────────────────────────────────
 
 export function discoveryDocument() {

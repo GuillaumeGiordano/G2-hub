@@ -18,6 +18,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const { verifier, state, nonce } = JSON.parse(raw) as { verifier: string; state: string; nonce: string };
 
 	let user;
+	let hubToken;
 	try {
 		const tokens = await oidc.authorizationCodeGrant(config, url, {
 			pkceCodeVerifier: verifier,
@@ -36,12 +37,17 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			role: toPortalRole(claims.role),
 			signedInAt: new Date()
 		};
+		// Kept on the server: with the secret key it opens the user's personal space (§28).
+		hubToken = {
+			accessToken: tokens.access_token,
+			expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000)
+		};
 	} catch (err) {
 		console.error('[portal] sign-in failed', err);
 		redirect(303, `/?erreur=${encodeURIComponent((err as Error).message)}`);
 	}
 
-	cookies.set(SESSION_COOKIE, createSession(user), {
+	cookies.set(SESSION_COOKIE, createSession({ user, hubToken }), {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',

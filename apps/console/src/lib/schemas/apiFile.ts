@@ -18,6 +18,23 @@ export const apiUploadSchema = z
 	})
 	.refine((b) => b.path || b.folder, 'Précisez le dossier : path ou folder.');
 
+/** A user's personal space (§28): « public » (avatar…: public bucket) or « private » (documents:
+ *  private bucket, signed links). */
+const space = z.enum(['public', 'private'], 'space : public ou private');
+
+/** POST /api/v1/me/uploads — reserve an upload in the signed-in user's personal space. */
+export const apiPersonalUploadSchema = z.object({
+	space,
+	name: z.string().trim().min(1, 'name requis').max(200, 'name : 200 caractères maximum'),
+	size: z.number('size invalide').int('size invalide').positive('size invalide'),
+	contentType: z.string().trim().min(1, 'contentType requis'),
+	alt,
+	caption
+});
+
+/** GET /api/v1/me/files?space=public|private */
+export const apiPersonalQuerySchema = z.object({ space });
+
 /** PATCH /api/v1/files/:id — alternative text and / or caption (null clears it). */
 export const apiFileTextSchema = z.object({ alt, caption });
 

@@ -19,7 +19,11 @@ export function appUserStatus(user: { passwordHash: string | null; disabledAt: D
 	return user.passwordHash ? 'ACTIVE' : 'INVITED';
 }
 
-export function toAppUserListItem(row: AppUserRow, now = new Date()): AppUserListItem {
+export function toAppUserListItem(
+	row: AppUserRow,
+	personal: { bytes: bigint; files: number } | undefined,
+	now = new Date()
+): AppUserListItem {
 	const status = appUserStatus(row);
 	const link = row.tokens[0];
 	return {
@@ -30,6 +34,8 @@ export function toAppUserListItem(row: AppUserRow, now = new Date()): AppUserLis
 		status,
 		invitationExpired: status === 'INVITED' && (!link || link.expiresAt <= now),
 		lastLoginAt: row.lastLoginAt,
-		createdAt: row.createdAt
+		createdAt: row.createdAt,
+		personalBytes: Number(personal?.bytes ?? 0n),
+		personalFiles: personal?.files ?? 0
 	};
 }

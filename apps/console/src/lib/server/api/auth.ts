@@ -1,5 +1,6 @@
 import * as keyRepo from '$lib/server/repositories/apiKeyRepository';
 import { hashKey } from '$lib/server/services/apiKeyService';
+import { appUserOfAccessToken } from '$lib/server/services/oidcService';
 import type { ApiKeyKind } from '$lib/records/apiKeys';
 
 // Authentication of the public API (/api/v1) by API key — DECISIONS.md §19. The key alone tells the
@@ -12,6 +13,9 @@ export type ApiContext = {
 	organizationId: string;
 	applicationId: string;
 	storageEnabled: boolean;
+	/** The signed-in application user, from `X-G2-User-Token` (their « Se connecter avec G2 Hub »
+	 *  access token) — the second proof of the personal-space routes (§28). null without it. */
+	appUserId: string | null;
 	/** The request's Origin when the application allows it — echoed in the CORS headers. */
 	corsOrigin: string | null;
 };
@@ -29,6 +33,19 @@ export class ApiError extends Error {
 export function requireSecret(ctx: ApiContext): void {
 	if (ctx.kind !== 'SECRET') throw new ApiError(403, 'Opération réservée à une clé secrète (côté serveur).');
 }
+
+/** A user's personal space needs BOTH proofs: the secret key (which application) and the user's
+ *  access token (which user, signed in right now). The user never comes from a request parameter. */
+export function requireUser(ctx: ApiContext): string {
+	requireSecret(ctx);
+	if (!ctx.appUserId) {
+		throw new ApiError(401, 'Jeton utilisateur manquant (en-tête X-G2-User-Token : son jeton d’accès « Se connecter avec G2 Hub »).');
+	}
+	return ctx.appUserId;
+}
+
+/** The header carrying the signed-in user's access token (personal spaces, §28). */
+export const USER_TOKEN_HEADER = 'x-g2-user-token';
 
 /** Refresh `lastUsedAt` at most this often (no write per request). */
 const TOUCH_EVERY_MS = 5 * 60_000;
@@ -62,6 +79,16 @@ export async function authenticate(request: Request, url: URL): Promise<ApiConte
 		throw new ApiError(403, `Origine non autorisée pour cette application : ${origin}`);
 	}
 
+	// The user's token only travels with a secret key (server to server); an unusable one is a 401
+	// (expired after an hour: the portal signs the user in again), never silently ignored.
+	const userToken = request.headers.get(USER_TOKEN_HEADER);
+	let appUserId: string | null = null;
+	if (userToken) {
+		if (row.kind !== 'SECRET') throw new ApiError(403, 'Le jeton utilisateur s’envoie avec une clé secrète (côté serveur).');
+		appUserId = await appUserOfAccessToken(userToken.trim(), row.applicationId);
+		if (!appUserId) throw new ApiError(401, 'Jeton utilisateur invalide ou expiré : reconnectez l’utilisateur.');
+	}
+
 	if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > TOUCH_EVERY_MS) {
 		keyRepo.touchKey(row.id).catch(() => {});
 	}
@@ -71,6 +98,7 @@ export async function authenticate(request: Request, url: URL): Promise<ApiConte
 		organizationId: row.organizationId,
 		applicationId: row.applicationId,
 		storageEnabled: row.organization.storageEnabled,
+		appUserId,
 		corsOrigin: allowed ? origin : null
 	};
 }

@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Prisma } from '@g2-hub/db';
 import { prisma } from '$lib/server/db';
 import * as userRepo from '$lib/server/repositories/appUserRepository';
+import * as fileRepo from '$lib/server/repositories/fileRepository';
+import { purgeObjects } from '$lib/server/storage/purge';
 import { appUserStatus, toAppUserListItem } from '$lib/server/mappers/appUserMapper';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { HubError, notFound } from '$lib/server/errors';
@@ -123,8 +125,10 @@ export async function listAppUsers(
 		}),
 		userRepo.countAppUsers(ctx.organization.id, applicationId, params.search)
 	]);
+	// How much each personal space holds (§28) — the console never shows their content.
+	const usage = await fileRepo.personalUsageByUser(ctx.organization.id, rows.map((r) => r.id));
 	const now = new Date();
-	return { items: rows.map((r) => toAppUserListItem(r, now)), total };
+	return { items: rows.map((r) => toAppUserListItem(r, usage.get(r.id), now)), total };
 }
 
 export async function inviteAppUser(ctx: OrgContext, applicationId: string, input: InviteInput) {
@@ -205,6 +209,8 @@ export async function deleteAppUser(ctx: OrgContext, applicationId: string, id: 
 	assertCan(ctx, 'appUsers.manage');
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
+	// The personal space's objects first (§28): the rows then go by cascade, freeing their bytes.
+	await purgeObjects(await fileRepo.listOwnedFilesForPurge(ctx.organization.id, user.id));
 	await userRepo.deleteAppUser(ctx.organization.id, applicationId, user.id);
 	return user.email;
 }

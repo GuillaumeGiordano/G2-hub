@@ -31,6 +31,7 @@
 		INVITATION_VALID_DAYS
 	} from '$lib/records/appUsers';
 	import { applicationTabs } from '$lib/records/navigation';
+	import { formatBytes } from '$lib/records/organization';
 	import { appUserInviteSchema, appUserRoleSchema } from '$lib/schemas/appUser';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
@@ -136,6 +137,15 @@
 	<span class="muted">{user.lastLoginAt ? dateFormat.format(user.lastLoginAt) : 'Jamais'}</span>
 {/snippet}
 
+{#snippet spaceCell(user: AppUserListItem)}
+	{#if user.personalFiles > 0}
+		<div>{formatBytes(user.personalBytes)}</div>
+		<div class="email">{user.personalFiles} fichier{user.personalFiles > 1 ? 's' : ''}</div>
+	{:else}
+		<span class="muted">—</span>
+	{/if}
+{/snippet}
+
 {#snippet actionsCell(user: AppUserListItem)}
 	<div class="actions">
 		{#if data.canManage}
@@ -227,6 +237,7 @@
 				{ key: 'role', label: 'Rôle', cell: roleCell },
 				{ key: 'status', label: 'État', cell: statusCell },
 				{ key: 'lastLoginAt', label: 'Dernière connexion', cell: lastLoginCell },
+				{ key: 'personalBytes', label: 'Espace personnel', align: 'right', cell: spaceCell },
 				{ key: 'id', label: '', align: 'right', cell: actionsCell }
 			]}
 		/>
@@ -330,8 +341,8 @@
 <Modal id={DELETE_MODAL_ID} title="Supprimer l'utilisateur">
 	<p class="confirm-text">
 		Supprimer le compte de <strong>{target?.name}</strong> ({target?.email}) ? Il ne pourra plus se
-		connecter au portail. Cette action est <strong>irréversible</strong> — pour suspendre l'accès
-		seulement, désactivez le compte.
+		connecter au portail, et les fichiers de son espace personnel sont supprimés. Cette action est
+		<strong>irréversible</strong> — pour suspendre l'accès seulement, désactivez le compte.
 	</p>
 	<form
 		method="POST"

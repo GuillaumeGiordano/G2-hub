@@ -15,6 +15,8 @@ export type StorageOverview = {
 	/** Every application, the biggest first (applications without files included, at 0). */
 	byApplication: (StorageShare & { id: string; name: string })[];
 	byKind: (StorageShare & { kind: FileKind })[];
+	/** Part of the above held by the application users' personal spaces (§28). */
+	personal: { bytes: number; files: number };
 	/** « Demander plus d'espace » target, or null (no button). */
 	upgradeUrl: string | null;
 };

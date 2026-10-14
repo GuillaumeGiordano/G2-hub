@@ -43,7 +43,8 @@ export type UploadScope = {
 	organizationId: string;
 	applicationId: string;
 	quotaBytes: number;
-	folder: { id: string; visibility: Visibility };
+	/** `ownerAppUserId` set = a root of a user's personal space (§28). */
+	folder: { id: string; visibility: Visibility; ownerAppUserId: string | null };
 	uploadedById: string | null;
 	apiKeyId: string | null;
 };
@@ -86,6 +87,7 @@ export async function reserveUpload(scope: UploadScope, input: UploadInput): Pro
 			name: input.name,
 			kind,
 			visibility: scope.folder.visibility,
+			ownerAppUserId: scope.folder.ownerAppUserId,
 			storagePrefix: prefixOf(organizationId, applicationId, fileId),
 			originalKey,
 			bytes: BigInt(input.size),
@@ -148,9 +150,18 @@ async function processOriginal(file: {
 	return { variants, width: large.width ?? null, height: large.height ?? null };
 }
 
+/** A file of the SITE (not a user's personal file, §28) of this application, or 404 — the console
+ *  only shows how much the personal spaces hold, never their content. */
+async function siteFileOrThrow(ctx: OrgContext, applicationId: string, fileId: string) {
+	const file = await fileRepo.findFile(ctx.organization.id, fileId);
+	if (!file || file.applicationId !== applicationId || file.ownerAppUserId) throw notFound('Fichier introuvable.');
+	return file;
+}
+
 /** Console: confirm an upload of the active organization. */
 export async function completeUpload(ctx: OrgContext, applicationId: string, fileId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
+	await siteFileOrThrow(ctx, applicationId, fileId);
 	await confirmUpload(ctx.organization.id, applicationId, fileId);
 }
 
@@ -264,8 +275,7 @@ export async function unpinFile(organizationId: string, applicationId: string, f
 /** Console: delete a file — except one a SITE uploaded, which only that site deletes (§22). */
 export async function deleteFile(ctx: OrgContext, applicationId: string, fileId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
-	const file = await fileRepo.findFile(ctx.organization.id, fileId);
-	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	const file = await siteFileOrThrow(ctx, applicationId, fileId);
 	if (file.source === 'API') {
 		throw new HubError('Ce fichier a été envoyé par le site : il se supprime depuis le site uniquement.', { status: 403 });
 	}
@@ -295,6 +305,7 @@ export async function updateFileText(
 	text: { alt?: string | null; caption?: string | null }
 ): Promise<void> {
 	assertCan(ctx, 'files.write');
+	await siteFileOrThrow(ctx, applicationId, fileId);
 	await setFileText(ctx.organization.id, applicationId, fileId, text);
 }
 

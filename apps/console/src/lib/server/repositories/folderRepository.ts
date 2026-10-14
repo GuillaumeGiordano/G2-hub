@@ -7,14 +7,17 @@ import { prisma } from '$lib/server/db';
 export function findFolder(organizationId: string, id: string) {
 	return prisma.folder.findFirst({
 		where: { id, organizationId },
-		select: { id: true, name: true, applicationId: true, parentId: true, visibility: true }
+		select: { id: true, name: true, applicationId: true, parentId: true, visibility: true, ownerAppUserId: true }
 	});
 }
+
+// The site's tree (console, /folders, /media) never includes the users' personal spaces (§28):
+// every listing below filters on `ownerAppUserId: null`.
 
 /** Every folder of an application (to build the folder filter with full paths). */
 export function listAllFolders(organizationId: string, applicationId: string) {
 	return prisma.folder.findMany({
-		where: { organizationId, applicationId },
+		where: { organizationId, applicationId, ownerAppUserId: null },
 		select: { id: true, name: true, parentId: true }
 	});
 }
@@ -22,7 +25,7 @@ export function listAllFolders(organizationId: string, applicationId: string) {
 /** Direct children of `parentId` (null = the application's root folders). */
 export function listChildren(organizationId: string, applicationId: string, parentId: string | null) {
 	return prisma.folder.findMany({
-		where: { organizationId, applicationId, parentId },
+		where: { organizationId, applicationId, parentId, ownerAppUserId: null },
 		orderBy: { name: 'asc' },
 		select: { id: true, name: true, visibility: true, _count: { select: { children: true } } }
 	});
@@ -36,7 +39,7 @@ export function findChildByName(
 	name: string
 ) {
 	return prisma.folder.findFirst({
-		where: { organizationId, applicationId, parentId, name: { equals: name, mode: 'insensitive' } },
+		where: { organizationId, applicationId, parentId, ownerAppUserId: null, name: { equals: name, mode: 'insensitive' } },
 		select: { id: true, name: true, parentId: true, visibility: true }
 	});
 }
@@ -54,6 +57,7 @@ export async function nameTaken(
 			organizationId,
 			applicationId,
 			parentId,
+			ownerAppUserId: null,
 			name: { equals: name, mode: 'insensitive' },
 			...(excludeId ? { id: { not: excludeId } } : {})
 		},
@@ -70,6 +74,38 @@ export function createFolder(data: {
 	visibility: Visibility;
 }) {
 	return prisma.folder.create({ data, select: { id: true, name: true } });
+}
+
+// ─── Personal spaces (§28) — the user was checked against the API key's application first ───
+
+const personalSelect = { id: true, visibility: true, ownerAppUserId: true } as const;
+
+/** The PUBLIC or PRIVATE root of a user's personal space, or null before its first use. */
+export function findPersonalRoot(organizationId: string, appUserId: string, visibility: Visibility) {
+	return prisma.folder.findFirst({
+		where: { organizationId, ownerAppUserId: appUserId, visibility, parentId: null },
+		select: personalSelect
+	});
+}
+
+/** Create a user's root (« public » / « private »). Two concurrent first uploads: the partial
+ *  unique index refuses the second one, which then reads the first one's folder. */
+export async function createPersonalRoot(data: {
+	organizationId: string;
+	applicationId: string;
+	ownerAppUserId: string;
+	visibility: Visibility;
+}) {
+	try {
+		return await prisma.folder.create({
+			data: { ...data, parentId: null, name: data.visibility === 'PUBLIC' ? 'public' : 'private' },
+			select: personalSelect
+		});
+	} catch (err) {
+		const existing = await findPersonalRoot(data.organizationId, data.ownerAppUserId, data.visibility);
+		if (existing) return existing;
+		throw err;
+	}
 }
 
 /** Returns the number of rows changed (0 = not in this organization). */
