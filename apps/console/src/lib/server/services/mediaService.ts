@@ -54,6 +54,7 @@ async function toMediaItem(row: MediaRow): Promise<MediaItem> {
 		folderName: row.folder.name,
 		visibility: row.visibility,
 		source: row.source,
+		pins: row.pins.map((p) => p.ref),
 		alt: row.alt,
 		caption: row.caption,
 		thumbUrl: thumb ? await urlOf(row.visibility, thumb.key) : null,

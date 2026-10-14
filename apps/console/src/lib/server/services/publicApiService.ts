@@ -4,6 +4,7 @@ import { ApiError, type ApiContext } from '$lib/server/api/auth';
 import * as storage from '$lib/server/storage/s3';
 import type { StoredVariant } from '$lib/server/storage/purge';
 import type { Visibility } from '$lib/records/storage';
+import { apiMediaQuerySchema, firstIssue } from '$lib/schemas/apiFile';
 
 // Read side of the public API (/api/v1) — DECISIONS.md §19. Everything is scoped by the KEY's
 // organization and application. A publishable key only ever sees PUBLIC folders: a private one is
@@ -37,6 +38,9 @@ export type ApiFile = {
 	versions: Record<string, ApiVersion>;
 	/** Why processing failed (FAILED only). */
 	error: string | null;
+	/** The site's pins (§23): while one exists the file cannot be deleted. Secret key only — a
+	 *  publishable key (seen by browsers) always gets [], the labels being the site's internals. */
+	pins: string[];
 };
 
 /** Signed links handed out for private files (secret keys only) stay valid this long. */
@@ -102,7 +106,7 @@ async function versionUrl(visibility: Visibility, key: string): Promise<string> 
 type FileRow = Awaited<ReturnType<typeof fileRepo.listFilesInFolder>>[number];
 
 /** A stored file → its API shape (public URLs, or signed links for a private file). */
-export async function toApiFile(f: FileRow): Promise<ApiFile> {
+export async function toApiFile(f: FileRow, kind: ApiContext['kind']): Promise<ApiFile> {
 	const versions: Record<string, ApiVersion> = {};
 	for (const v of f.variants as StoredVariant[]) {
 		versions[v.name] = {
@@ -128,8 +132,24 @@ export async function toApiFile(f: FileRow): Promise<ApiFile> {
 		url: main?.url ?? '',
 		thumbnailUrl: (versions.thumb ?? versions.poster)?.url ?? null,
 		versions,
-		error: f.error
+		error: f.error,
+		pins: kind === 'SECRET' ? f.pins.map((p) => p.ref) : []
 	};
+}
+
+/** GET /api/v1/media — the application's READY files, every folder together, newest first: what a
+ *  « choose a media » picker of a site's back-office lists (§23). Publishable key: public only. */
+export async function listMedia(ctx: ApiContext, url: URL) {
+	assertStorage(ctx);
+	const parsed = apiMediaQuerySchema.safeParse(Object.fromEntries(url.searchParams));
+	if (!parsed.success) throw new ApiError(400, firstIssue(parsed.error));
+	const { q, kind, page, perPage } = parsed.data;
+	const filter = { kind, search: q || undefined, visibility: ctx.kind === 'PUBLISHABLE' ? ('PUBLIC' as const) : undefined };
+	const [rows, total] = await Promise.all([
+		fileRepo.searchMedia(ctx.organizationId, ctx.applicationId, filter, { skip: (page - 1) * perPage, take: perPage }),
+		fileRepo.countMedia(ctx.organizationId, ctx.applicationId, filter)
+	]);
+	return { files: await Promise.all(rows.map((f) => toApiFile(f, ctx.kind))), total, page, perPage };
 }
 
 /** GET /api/v1/files — the READY files of a folder (newest first). */
@@ -138,5 +158,5 @@ export async function listFiles(ctx: ApiContext, url: URL) {
 	const folder = await resolveFolder(ctx, { path: url.searchParams.get('path'), folder: url.searchParams.get('folder') });
 	if (!folder) throw new ApiError(400, 'Précisez un dossier : ?path=Galerie ou ?folder=<id>.');
 	const rows = (await fileRepo.listFilesInFolder(ctx.organizationId, folder.id)).filter((f) => f.status === 'READY');
-	return { folder, files: await Promise.all(rows.map(toApiFile)) };
+	return { folder, files: await Promise.all(rows.map((f) => toApiFile(f, ctx.kind))) };
 }

@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { HubError, type HubFile } from '@g2/hub-client';
-import { findCreation, listCreations, removeCreation } from '$lib/server/db';
-import { hubAdmin } from '$lib/server/hub';
+import { addCreation, findCreation, listCreations, removeCreation } from '$lib/server/db';
+import { hubAdmin, pinRef } from '$lib/server/hub';
 import type { Actions, PageServerLoad } from './$types';
 
 /** A creation of the site's database joined with its photo in G2 Hub (null if unreachable). */
@@ -31,20 +31,62 @@ export const load: PageServerLoad = async () => {
 	return { rows, configured: !!hub };
 };
 
+/** A hub call whose 404 (file already gone from the hub) is not an error for the site. */
+async function ignoringNotFound(call: () => Promise<unknown>): Promise<void> {
+	try {
+		await call();
+	} catch (err) {
+		if (!(err instanceof HubError && err.status === 404)) throw err;
+	}
+}
+
+const failure = (err: unknown, fallback: string) =>
+	fail(err instanceof HubError && err.status ? err.status : 502, { message: err instanceof HubError ? err.message : fallback });
+
 export const actions: Actions = {
-	/** Delete a creation: its photo in G2 Hub (only the site may — §22), then the site's row. */
+	/** A creation whose photo is CHOSEN in the hub's media library (§23): saved with its file id,
+	 *  then the photo is pinned so that nobody deletes it in the hub while the creation uses it. */
+	pick: async ({ request }) => {
+		const form = await request.formData();
+		const fileId = String(form.get('fileId') ?? '');
+		const title = String(form.get('title') ?? '').trim();
+		const price = Number(String(form.get('price') ?? '').replace(',', '.'));
+		const hub = hubAdmin();
+		if (!hub) return fail(503, { message: 'DEMO_HUB_SECRET_KEY non configurée.' });
+		if (!fileId || !title) return fail(400, { message: 'Choisissez une photo et donnez-lui un titre.' });
+		try {
+			const file = await hub.file(fileId);
+			if (file.kind !== 'IMAGE' || file.status !== 'READY') return fail(400, { message: 'Choisissez une image prête.' });
+			const creation = await addCreation({
+				hubFileId: file.id,
+				ownsPhoto: false,
+				title,
+				priceCents: String(form.get('price') ?? '').trim() && Number.isFinite(price) ? Math.round(price * 100) : null
+			});
+			try {
+				await hub.pinFile(file.id, pinRef(creation.id));
+			} catch (err) {
+				await removeCreation(creation.id); // unprotected photo = no creation
+				throw err;
+			}
+			return { picked: title };
+		} catch (err) {
+			return failure(err, 'Ajout impossible.');
+		}
+	},
+
+	/** Delete a creation: free its photo in G2 Hub, delete the photo too if it was uploaded for this
+	 *  creation (a library photo stays in the library), then the site's row. */
 	delete: async ({ request }) => {
 		const id = String((await request.formData()).get('id') ?? '');
 		const creation = await findCreation(id);
 		const hub = hubAdmin();
 		if (!creation || !hub) return fail(404, { message: 'Création introuvable.' });
 		try {
-			await hub.deleteFile(creation.hubFileId);
+			await ignoringNotFound(() => hub.unpinFile(creation.hubFileId, pinRef(creation.id)));
+			if (creation.ownsPhoto !== false) await ignoringNotFound(() => hub.deleteFile(creation.hubFileId));
 		} catch (err) {
-			// Already gone from the hub: the site's row is removed anyway.
-			if (!(err instanceof HubError && err.status === 404)) {
-				return fail(502, { message: err instanceof HubError ? err.message : 'Suppression impossible.' });
-			}
+			return failure(err, 'Suppression impossible.');
 		}
 		await removeCreation(id);
 		return { deleted: true };

@@ -23,3 +23,7 @@ export function hubAdmin(): HubClient | null {
 }
 
 export const galleryPath = () => env.DEMO_GALLERY_PATH || 'Galerie';
+
+/** The label of a creation's use of its photo in G2 Hub: while pinned, nobody can delete it there
+ *  (DECISIONS.md §23). One label per use, so two creations sharing a photo hold two pins. */
+export const pinRef = (creationId: string) => `creation:${creationId}`;

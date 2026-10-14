@@ -2,15 +2,20 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { Alert, Badge, Button, Card, EmptyState, FileInput, Input, Progress, Table, Textarea } from '@guillaumeg/ui';
-	import { ImagePlus, Trash2 } from '@lucide/svelte';
+	import { ImagePlus, Plus, Trash2 } from '@lucide/svelte';
+	import MediaPicker, { type PickedMedia } from '$lib/components/MediaPicker.svelte';
 	import type { CreationRow } from './+page.server';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
 	// The demo site's own admin — what a client's back-office does to feed its gallery (§22):
 	// 1. the site's server gets an upload ticket from G2 Hub (secret key, never in this page);
 	// 2. this page PUTs the photo straight to storage with the signed URL (progress bar);
 	// 3. the site's server confirms it and saves title + price + G2 Hub file id in ITS database.
-	let { data }: { data: PageData } = $props();
+	// Or the photo is CHOSEN in the hub's media library (§23): the site stores its id and pins it.
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let picked = $state<PickedMedia | null>(null);
+	let pickBusy = $state(false);
 
 	let file = $state<File | null>(null);
 	let title = $state('');
@@ -154,6 +159,49 @@
 		</form>
 	</Card>
 
+	<Card>
+		{#snippet header()}
+			<div class="card-title">Utiliser une photo de la médiathèque</div>
+		{/snippet}
+		<form
+			class="form"
+			method="POST"
+			action="?/pick"
+			use:enhance={() => {
+				pickBusy = true;
+				return async ({ result, update }) => {
+					pickBusy = false;
+					if (result.type === 'success') picked = null;
+					await update();
+				};
+			}}
+		>
+			<div class="chosen">
+				{#if picked?.thumbnailUrl}
+					<img class="thumb" src={picked.thumbnailUrl} alt={picked.alt ?? picked.name} />
+					<span class="muted">{picked.name}</span>
+				{:else}
+					<span class="muted">Aucune photo choisie.</span>
+				{/if}
+				<MediaPicker endpoint="/admin/media" onselect={(m) => (picked = m)} />
+			</div>
+			<input type="hidden" name="fileId" value={picked?.id ?? ''} />
+			<div class="row">
+				<Input label="Titre" name="title" required placeholder="Pain de campagne" />
+				<Input label="Prix (€)" name="price" placeholder="3,20" />
+			</div>
+			<p class="muted small">
+				La photo reste dans la médiathèque : le site l'épingle, G2 Hub en bloque la suppression tant
+				que cette création l'utilise.
+			</p>
+			{#if form?.message}<Alert variant="error">{form.message}</Alert>{/if}
+			{#if form?.picked}<Alert variant="success">« {form.picked} » ajoutée avec une photo de la médiathèque.</Alert>{/if}
+			<div class="form-submit">
+				<Button type="submit" icon={Plus} loading={pickBusy} disabled={!data.configured || !picked}>Ajouter</Button>
+			</div>
+		</form>
+	</Card>
+
 	<h2>Créations du site ({data.rows.length})</h2>
 	{#if data.rows.length === 0}
 		<EmptyState icon={ImagePlus} title="Aucune création" description="Ajoutez une première photo ci-dessus." />
@@ -225,6 +273,12 @@
 	.right {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.chosen {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
 	}
 	.thumb {
 		width: 56px;

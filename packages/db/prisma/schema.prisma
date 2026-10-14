@@ -179,11 +179,26 @@ model StoredFile {
   uploadedById   String?
   uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   jobs           MediaJob[]
+  pins           FilePin[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId, folderId])
   @@index([organizationId, status])
+}
+
+/// A site uses this file (e.g. in a product card): while at least one pin exists, the file cannot
+/// be deleted — from the console or the API (DECISIONS.md §23). `ref` is the site's own label of
+/// the use ("product:42"), so two cards sharing a photo hold two pins and freeing one keeps it
+/// protected. Scoped through the file (organization + application).
+model FilePin {
+  id        String     @id @default(uuid())
+  fileId    String
+  file      StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  ref       String
+  createdAt DateTime   @default(now())
+
+  @@unique([fileId, ref])
 }
 
 // ─── API ─────────────────────────────────────────────────────────────────────

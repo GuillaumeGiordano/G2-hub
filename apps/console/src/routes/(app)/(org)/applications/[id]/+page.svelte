@@ -176,6 +176,7 @@
 		{fileKindLabel[file.kind]}{file.width ? ` · ${file.width} × ${file.height}` : ''}
 	</div>
 	{#if file.source === 'API'}<Badge label="Envoyé par le site" variant="primary" />{/if}
+	{#if file.pins.length}<Badge label="Utilisé par le site" variant="warning" />{/if}
 	{#if file.error}<div class="file-error">{file.error}</div>{/if}
 {/snippet}
 
@@ -215,7 +216,7 @@
 						}}
 					/>
 				{/if}
-				{#if b.canWrite && file.source !== 'API'}
+				{#if b.canWrite && file.source !== 'API' && !file.pins.length}
 					<ButtonActionItem
 						label="Supprimer"
 						icon={Trash2}

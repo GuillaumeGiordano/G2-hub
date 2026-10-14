@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/state';
 	import { Alert, Badge, Breadcrumb, EmptyState, Input, Pagination, SearchFilters, Select } from '@guillaumeg/ui';
-	import { FileText, Images, Play } from '@lucide/svelte';
+	import { FileText, Images, Pin, Play } from '@lucide/svelte';
 	import MediaViewer from '$lib/components/media/MediaViewer.svelte';
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
@@ -86,6 +86,7 @@
 								{#if media.kind === 'VIDEO'}<span class="badge-icon"><Play size={16} /></span>{/if}
 								{#if media.visibility === 'PRIVATE'}<span class="private">Privé</span>{/if}
 								{#if media.source === 'API'}<span class="site">Site</span>{/if}
+								{#if media.pins.length}<span class="pinned" title="Utilisé par le site"><Pin size={12} /> Utilisé</span>{/if}
 							</span>
 							<span class="name">{media.name}</span>
 							<span class="folder">{media.folderName}</span>
@@ -172,6 +173,19 @@
 		font-size: 11px;
 		background: rgb(0 0 0 / 0.55);
 		color: #fff;
+	}
+	.pinned {
+		position: absolute;
+		bottom: 6px;
+		left: 6px;
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 6px;
+		border-radius: var(--radius-sm);
+		font-size: 11px;
+		background: var(--warning-subtle);
+		color: var(--warning-subtle-fg);
 	}
 	.site {
 		position: absolute;

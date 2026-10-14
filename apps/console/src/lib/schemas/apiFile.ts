@@ -21,6 +21,22 @@ export const apiUploadSchema = z
 /** PATCH /api/v1/files/:id — alternative text and / or caption (null clears it). */
 export const apiFileTextSchema = z.object({ alt, caption });
 
+/** PUT / DELETE /api/v1/files/:id/pins/:ref — the site's label of a use (§23), e.g. "product:42".
+ *  In the URL, hence no "/" (letters, digits, `: _ - .`). */
+export const apiPinRefSchema = z
+	.string()
+	.min(1, 'ref requis')
+	.max(200, 'ref : 200 caractères maximum')
+	.regex(/^[A-Za-z0-9:_.-]+$/, 'ref : lettres, chiffres et : _ - . uniquement');
+
+/** GET /api/v1/media — the application's library (every folder), for a « choose a media » picker. */
+export const apiMediaQuerySchema = z.object({
+	q: z.string().trim().max(200).optional(),
+	kind: z.enum(['IMAGE', 'VIDEO', 'PDF'], 'kind : IMAGE, VIDEO ou PDF').optional(),
+	page: z.coerce.number('page invalide').int().min(1).default(1),
+	perPage: z.coerce.number('perPage invalide').int().min(1).max(100, 'perPage : 100 maximum').default(24)
+});
+
 /** The first message of a failed parse. */
 export function firstIssue(error: z.ZodError): string {
 	return error.issues[0]?.message ?? 'Requête invalide.';

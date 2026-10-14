@@ -135,6 +135,14 @@ export async function deleteFolder(ctx: OrgContext, applicationId: string, folde
 			{ status: 403 }
 		);
 	}
+	const pinned = await fileRepo.countPinnedFilesInFolders(ctx.organization.id, folderIds);
+	if (pinned) {
+		throw new HubError(
+			`Ce dossier contient ${pinned} fichier${pinned > 1 ? 's' : ''} utilisé${pinned > 1 ? 's' : ''} par le site : ` +
+				"il doit d'abord les libérer.",
+			{ status: 409 }
+		);
+	}
 	await purgeObjects(await fileRepo.listFilesInFolders(ctx.organization.id, folderIds));
 	await folderRepo.deleteFolder(ctx.organization.id, folder.id);
 }

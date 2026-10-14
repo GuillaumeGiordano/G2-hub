@@ -221,6 +221,7 @@ export async function listFiles(ctx: OrgContext, folderId: string): Promise<File
 				error: f.error,
 				createdAt: f.createdAt,
 				source: f.source,
+				pins: f.pins.map((p) => p.ref),
 				alt: f.alt,
 				caption: f.caption,
 				thumbUrl: await urlOf(f.visibility, thumb),
@@ -231,12 +232,33 @@ export async function listFiles(ctx: OrgContext, folderId: string): Promise<File
 	);
 }
 
-/** Core of a deletion: the objects first, then the row (its bytes are freed at once — §10). */
+/** Core of a deletion: the objects first, then the row (its bytes are freed at once — §10). A file
+ *  a site has pinned is refused, from the console AND the API (§23): another card may use it. */
 export async function removeFile(organizationId: string, applicationId: string, fileId: string): Promise<void> {
 	const file = await fileRepo.findFile(organizationId, fileId);
 	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	if (file.pins.length) {
+		throw new HubError(
+			`Ce fichier est utilisé par le site (${file.pins.map((p) => p.ref).join(', ')}) : il doit d'abord le libérer.`,
+			{ status: 409 }
+		);
+	}
 	await purgeObjects([file]);
 	await fileRepo.deleteFile(organizationId, fileId);
+}
+
+/** Core: the site declares it uses the file (`ref` = its own label, e.g. "product:42"). Idempotent. */
+export async function pinFile(organizationId: string, applicationId: string, fileId: string, ref: string): Promise<void> {
+	const file = await fileRepo.findFile(organizationId, fileId);
+	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	await fileRepo.addPin(file.id, ref);
+}
+
+/** Core: the site no longer uses the file for `ref`. Idempotent. */
+export async function unpinFile(organizationId: string, applicationId: string, fileId: string, ref: string): Promise<void> {
+	const file = await fileRepo.findFile(organizationId, fileId);
+	if (!file || file.applicationId !== applicationId) throw notFound('Fichier introuvable.');
+	await fileRepo.removePin(file.id, ref);
 }
 
 /** Console: delete a file — except one a SITE uploaded, which only that site deletes (§22). */

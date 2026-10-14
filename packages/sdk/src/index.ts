@@ -53,7 +53,13 @@ export type HubFile = {
 	versions: Record<string, HubVersion>;
 	/** Why processing failed (FAILED only). */
 	error: string | null;
+	/** The site's pins ("product:42"…): while one exists the hub refuses to delete the file. Filled
+	 *  for a secret key only (always [] with a publishable key). */
+	pins: string[];
 };
+
+/** One page of the application's media library (every folder), for a « choose a media » picker. */
+export type HubMediaListing = { files: HubFile[]; total: number; page: number; perPage: number };
 
 /** Where to upload: a folder `path` ("Galerie/2026") or its `folder` id. */
 export type HubUploadTarget = { path: string; folder?: never } | { folder: string; path?: never };
@@ -125,6 +131,9 @@ export type HubClient = {
 	files(path: string): Promise<HubFileListing>;
 	/** One file by id (a publishable key only sees a READY file of a public folder). */
 	file(id: string): Promise<HubFile>;
+	/** The application's READY files, every folder together, newest first — what a « choose a media »
+	 *  picker lists. `q` searches the name; a publishable key only sees public files. */
+	media(params?: { q?: string; kind?: HubFileKind; page?: number; perPage?: number }): Promise<HubMediaListing>;
 
 	// ── Secret key (server side) ──
 	/** Reserve an upload (type, size, quota checked) and get the signed URL to PUT the file to. */
@@ -135,8 +144,14 @@ export type HubClient = {
 	uploadFile(request: Omit<HubUploadRequest, 'size'> & { data: Blob | ArrayBuffer | Uint8Array }): Promise<HubFile>;
 	/** Set alt and / or caption (null clears; absent = unchanged). */
 	updateFile(id: string, text: { alt?: string | null; caption?: string | null }): Promise<HubFile>;
-	/** Delete a file (and free its space). */
+	/** Delete a file (and free its space). Refused (409) while the file is pinned. */
 	deleteFile(id: string): Promise<void>;
+	/** Declare that the site uses the file for `ref` (its own label, e.g. "product:42": letters, digits,
+	 *  `: _ - .`). While at least one pin exists, nobody can delete it — a card keeps its photo.
+	 *  Idempotent. */
+	pinFile(id: string, ref: string): Promise<HubFile>;
+	/** The site no longer uses the file for `ref` (card deleted, photo replaced). Idempotent. */
+	unpinFile(id: string, ref: string): Promise<HubFile>;
 	/** Invite someone to the application's portal: the account is created and the invitation
 	 *  e-mailed (link valid 7 days). `role` defaults to USER. 400 if the address is already invited /
 	 *  registered. */
@@ -179,7 +194,7 @@ export function createHubClient(options: HubClientOptions): HubClient {
 	}
 
 	/** A write (secret key only): no stale fallback — a write must really happen or fail. */
-	async function send<T>(method: 'POST' | 'PATCH' | 'DELETE', endpoint: string, body?: unknown): Promise<T> {
+	async function send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', endpoint: string, body?: unknown): Promise<T> {
 		if (!secret) throw new HubError(403, 'Opération réservée à une clé secrète (côté serveur).');
 		let res: Response;
 		try {
@@ -200,6 +215,13 @@ export function createHubClient(options: HubClientOptions): HubClient {
 		folders: (path) => get<HubFolderListing>('folders', { path }),
 		files: (path) => get<HubFileListing>('files', { path }),
 		file: (id) => get<HubFile>(`files/${encodeURIComponent(id)}`),
+		media: (params = {}) =>
+			get<HubMediaListing>('media', {
+				q: params.q,
+				kind: params.kind,
+				page: params.page ? String(params.page) : undefined,
+				perPage: params.perPage ? String(params.perPage) : undefined
+			}),
 		createUpload: (request) => send<HubUploadTicket>('POST', 'uploads', request),
 		completeUpload: (fileId) => send<HubFile>('POST', `uploads/${encodeURIComponent(fileId)}/complete`),
 		async uploadFile({ data, ...request }) {
@@ -217,6 +239,8 @@ export function createHubClient(options: HubClientOptions): HubClient {
 		deleteFile: async (id) => {
 			await send<{ deleted: true }>('DELETE', `files/${encodeURIComponent(id)}`);
 		},
+		pinFile: (id, ref) => send<HubFile>('PUT', `files/${encodeURIComponent(id)}/pins/${encodeURIComponent(ref)}`),
+		unpinFile: (id, ref) => send<HubFile>('DELETE', `files/${encodeURIComponent(id)}/pins/${encodeURIComponent(ref)}`),
 		inviteUser: (user) => send<HubUser>('POST', 'users', user)
 	};
 	return client;

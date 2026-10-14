@@ -15,6 +15,8 @@ export type MediaItem = {
 	visibility: Visibility;
 	/** CONSOLE, or API = uploaded by the client site: deleted from the site only (§22). */
 	source: 'CONSOLE' | 'API';
+	/** The site's pins (« product:42 »…): while one exists the file cannot be deleted (§23). */
+	pins: string[];
 	alt: string | null;
 	caption: string | null;
 	/** Grid tile: image thumbnail or video poster (null for a PDF). */

@@ -129,6 +129,12 @@
 						<dt>Ajouté le</dt>
 						<dd>{dateFormat.format(media.createdAt)}{media.source === 'API' ? ' · par le site' : ''}</dd>
 					</div>
+					{#if media.pins.length}
+						<div>
+							<dt>Utilisé par le site</dt>
+							<dd>{media.pins.join(', ')}</dd>
+						</div>
+					{/if}
 				</dl>
 
 				{#if canWrite}
@@ -178,6 +184,8 @@
 					</Button>
 					{#if canWrite && media.source === 'API'}
 						<Alert variant="info">Envoyé par le site : il se supprime depuis le site uniquement.</Alert>
+					{:else if canWrite && media.pins.length}
+						<Alert variant="info">Utilisé par le site : il ne peut pas être supprimé tant que le site ne l'a pas libéré.</Alert>
 					{:else if canWrite}
 						{#if confirmingDelete}
 							<form

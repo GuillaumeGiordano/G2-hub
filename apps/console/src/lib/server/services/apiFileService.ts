@@ -1,9 +1,9 @@
 import * as orgRepo from '$lib/server/repositories/organizationRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
 import { ApiError, requireSecret, type ApiContext } from '$lib/server/api/auth';
-import { apiFileTextSchema, apiUploadSchema, firstIssue } from '$lib/schemas/apiFile';
+import { apiFileTextSchema, apiPinRefSchema, apiUploadSchema, firstIssue } from '$lib/schemas/apiFile';
 import { assertStorage, canSee, resolveFolder, toApiFile, type ApiFile } from './publicApiService';
-import { confirmUpload, removeFile, reserveUpload, setFileText } from './fileService';
+import { confirmUpload, pinFile, removeFile, reserveUpload, setFileText, unpinFile } from './fileService';
 
 // Write side of the public API — a client SITE alimenting its gallery from its own admin
 // (DECISIONS.md §22). Every write needs the SECRET key (server-side only): the site's server asks for
@@ -56,7 +56,7 @@ export async function completeUpload(ctx: ApiContext, fileId: string): Promise<A
 	requireSecret(ctx);
 	await fileOrThrow(ctx, fileId);
 	await confirmUpload(ctx.organizationId, ctx.applicationId, fileId);
-	return toApiFile(await fileOrThrow(ctx, fileId));
+	return toApiFile(await fileOrThrow(ctx, fileId), ctx.kind);
 }
 
 /** GET /api/v1/files/:id — one file. A publishable key only sees a READY file of a public folder. */
@@ -66,7 +66,7 @@ export async function getFile(ctx: ApiContext, fileId: string): Promise<ApiFile>
 	if (ctx.kind === 'PUBLISHABLE' && (!canSee(ctx, file.visibility) || file.status !== 'READY')) {
 		throw new ApiError(404, 'Fichier introuvable.');
 	}
-	return toApiFile(file);
+	return toApiFile(file, ctx.kind);
 }
 
 /** PATCH /api/v1/files/:id — set alt and / or caption (null clears; absent = unchanged). */
@@ -75,10 +75,32 @@ export async function updateFile(ctx: ApiContext, fileId: string, body: unknown)
 	const parsed = apiFileTextSchema.safeParse(body);
 	if (!parsed.success) throw new ApiError(400, firstIssue(parsed.error));
 	await setFileText(ctx.organizationId, ctx.applicationId, fileId, parsed.data);
-	return toApiFile(await fileOrThrow(ctx, fileId));
+	return toApiFile(await fileOrThrow(ctx, fileId), ctx.kind);
 }
 
-/** DELETE /api/v1/files/:id — the site removes one of its files (objects + row; space freed). */
+function pinRef(raw: string): string {
+	const parsed = apiPinRefSchema.safeParse(raw);
+	if (!parsed.success) throw new ApiError(400, firstIssue(parsed.error));
+	return parsed.data;
+}
+
+/** PUT /api/v1/files/:id/pins/:ref — the site uses the file (a card…): it can no longer be deleted
+ *  until every pin is freed (§23). Idempotent. */
+export async function pin(ctx: ApiContext, fileId: string, ref: string): Promise<ApiFile> {
+	requireSecret(ctx);
+	await pinFile(ctx.organizationId, ctx.applicationId, fileId, pinRef(ref));
+	return toApiFile(await fileOrThrow(ctx, fileId), ctx.kind);
+}
+
+/** DELETE /api/v1/files/:id/pins/:ref — the site no longer uses the file for `ref`. Idempotent. */
+export async function unpin(ctx: ApiContext, fileId: string, ref: string): Promise<ApiFile> {
+	requireSecret(ctx);
+	await unpinFile(ctx.organizationId, ctx.applicationId, fileId, pinRef(ref));
+	return toApiFile(await fileOrThrow(ctx, fileId), ctx.kind);
+}
+
+/** DELETE /api/v1/files/:id — the site removes one of its files (objects + row; space freed).
+ *  409 while the file is pinned (§23). */
 export async function deleteFile(ctx: ApiContext, fileId: string): Promise<{ deleted: true }> {
 	requireSecret(ctx);
 	await removeFile(ctx.organizationId, ctx.applicationId, fileId);

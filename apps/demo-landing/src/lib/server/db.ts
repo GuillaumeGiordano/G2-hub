@@ -8,8 +8,11 @@ import { dirname, resolve } from 'node:path';
 
 export type Creation = {
 	id: string;
-	/** The photo in G2 Hub. */
+	/** The photo in G2 Hub — pinned there as `creation:<id>` while this creation uses it (§23). */
 	hubFileId: string;
+	/** false = picked from the hub's media library: deleting the creation only unpins it. Missing
+	 *  (older rows) or true = uploaded for this creation: deleting the creation deletes it too. */
+	ownsPhoto?: boolean;
 	title: string;
 	/** Price in cents, or null. */
 	priceCents: number | null;

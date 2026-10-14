@@ -23,7 +23,9 @@ const fileSelect = {
 	error: true,
 	folderId: true,
 	applicationId: true,
-	createdAt: true
+	createdAt: true,
+	/** Uses declared by the site: a pinned file cannot be deleted (§23). */
+	pins: { select: { ref: true }, orderBy: { createdAt: 'asc' } }
 } as const;
 
 export function findFile(organizationId: string, id: string) {
@@ -38,12 +40,15 @@ export function listFilesInFolder(organizationId: string, folderId: string) {
 	});
 }
 
+/** Filters of the media library (console and API). `visibility`: PUBLIC for a publishable key. */
+export type MediaFilter = { kind?: FileKind; folderIds?: string[]; search?: string; visibility?: Visibility };
+
 /** The media library of an application: READY files, newest first, optionally filtered by kind,
  *  folders (a folder and its subtree) and name. */
 function mediaWhere(
 	organizationId: string,
 	applicationId: string,
-	filter: { kind?: FileKind; folderIds?: string[]; search?: string }
+	filter: MediaFilter
 ): Prisma.StoredFileWhereInput {
 	return {
 		organizationId,
@@ -51,6 +56,7 @@ function mediaWhere(
 		status: 'READY',
 		...(filter.kind ? { kind: filter.kind } : {}),
 		...(filter.folderIds ? { folderId: { in: filter.folderIds } } : {}),
+		...(filter.visibility ? { visibility: filter.visibility } : {}),
 		...(filter.search ? { name: { contains: filter.search, mode: 'insensitive' } } : {})
 	};
 }
@@ -58,7 +64,7 @@ function mediaWhere(
 export function searchMedia(
 	organizationId: string,
 	applicationId: string,
-	filter: { kind?: FileKind; folderIds?: string[]; search?: string },
+	filter: MediaFilter,
 	page: { skip: number; take: number }
 ) {
 	return prisma.storedFile.findMany({
@@ -81,7 +87,7 @@ export function findMediaById(organizationId: string, applicationId: string, id:
 export function countMedia(
 	organizationId: string,
 	applicationId: string,
-	filter: { kind?: FileKind; folderIds?: string[]; search?: string }
+	filter: MediaFilter
 ) {
 	return prisma.storedFile.count({ where: mediaWhere(organizationId, applicationId, filter) });
 }
@@ -100,6 +106,23 @@ export async function countSiteFilesByApplication(organizationId: string): Promi
  *  from the console (§22). */
 export function countSiteFilesInFolders(organizationId: string, folderIds: string[]) {
 	return prisma.storedFile.count({ where: { organizationId, folderId: { in: folderIds }, source: 'API' } });
+}
+
+/** How many files under these folders a site has pinned — they cannot be deleted (§23). */
+export function countPinnedFilesInFolders(organizationId: string, folderIds: string[]) {
+	return prisma.storedFile.count({ where: { organizationId, folderId: { in: folderIds }, pins: { some: {} } } });
+}
+
+// ─── Pins (§23) — the file id was checked against the API key's application first ───
+
+/** Idempotent: pinning twice with the same `ref` keeps one pin. */
+export function addPin(fileId: string, ref: string) {
+	return prisma.filePin.createMany({ data: [{ fileId, ref }], skipDuplicates: true });
+}
+
+/** Idempotent: freeing a `ref` that is not there changes nothing. */
+export function removePin(fileId: string, ref: string) {
+	return prisma.filePin.deleteMany({ where: { fileId, ref } });
 }
 
 /** Every file under these folders (to purge their objects before deleting a folder tree). */

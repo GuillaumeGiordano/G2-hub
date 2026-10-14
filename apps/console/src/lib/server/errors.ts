@@ -1,10 +1,11 @@
 // A business error meant for the user (vs. an unexpected failure). `field` puts the message under
-// that form field; `status` lets a route answer 403 / 404 instead of a 400 validation error.
+// that form field; `status` lets a route answer 403 / 404 / 409 instead of a 400 validation error
+// (409: the request is valid but the current state forbids it, e.g. deleting a pinned file).
 export class HubError extends Error {
 	readonly field?: string;
-	readonly status: 400 | 403 | 404;
+	readonly status: 400 | 403 | 404 | 409;
 
-	constructor(message: string, options: { field?: string; status?: 400 | 403 | 404 } = {}) {
+	constructor(message: string, options: { field?: string; status?: 400 | 403 | 404 | 409 } = {}) {
 		super(message);
 		this.field = options.field;
 		this.status = options.status ?? 400;
