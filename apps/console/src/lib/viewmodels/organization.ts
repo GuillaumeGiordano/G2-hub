@@ -6,6 +6,8 @@ export type OrganizationListItem = {
 	name: string;
 	slug: string;
 	quotaBytes: number;
+	/** Bytes counted toward the quota (all its applications). */
+	usedBytes: number;
 	storageEnabled: boolean;
 	memberCount: number;
 	applicationCount: number;

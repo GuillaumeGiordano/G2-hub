@@ -73,6 +73,32 @@ export function updateOrganization(
 	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
 
+// ─── Internal API (G2 WebDev portal, instance token — no organization scope by design) ───
+
+const billingSelect = {
+	id: true,
+	name: true,
+	slug: true,
+	quotaBytes: true,
+	storageEnabled: true,
+	createdAt: true,
+	_count: { select: { memberships: true, applications: true, appUsers: true } }
+} as const;
+
+/** Every organization of the instance, with what the portal bills on. */
+export function listOrganizationsForBilling() {
+	return prisma.organization.findMany({ orderBy: { name: 'asc' }, select: billingSelect });
+}
+
+export function findOrganizationForBilling(id: string) {
+	return prisma.organization.findUnique({ where: { id }, select: billingSelect });
+}
+
+/** The plan only (tier + storage option) — what the portal changes after a payment. */
+export function updatePlan(id: string, data: { quotaBytes?: bigint; storageEnabled?: boolean }) {
+	return prisma.organization.update({ where: { id }, data, select: { id: true } });
+}
+
 export function deleteOrganization(id: string) {
 	return prisma.organization.delete({ where: { id }, select: { name: true } });
 }

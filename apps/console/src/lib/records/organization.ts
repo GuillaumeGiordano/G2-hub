@@ -40,6 +40,45 @@ export function formatBytes(bytes: number): string {
 
 export const quotaOptions = QUOTA_TIERS.map((b) => ({ value: String(b), label: formatBytes(b) }));
 
+export const isQuotaTier = (bytes: number) => (QUOTA_TIERS as readonly number[]).includes(bytes);
+
+/** The tier above `quotaBytes`, or null at the top (DECISIONS.md §10). */
+export function nextQuotaTier(quotaBytes: number): number | null {
+	return QUOTA_TIERS.find((t) => t > quotaBytes) ?? null;
+}
+
+// ─── Storage usage (step 4) ─────────────────────────────────────────────────
+
+/** From this share of the quota on, the Admin is warned that the space is running out. */
+export const STORAGE_WARNING_PERCENT = 80;
+
+/** OK; WARNING = running out; FULL = uploads are refused (strict quota, §10). */
+export type UsageLevel = 'OK' | 'WARNING' | 'FULL';
+
+/** Share of the quota used, 0–100 (rounded, capped). */
+export function usagePercent(usedBytes: number, quotaBytes: number): number {
+	return quotaBytes > 0 ? Math.min(100, Math.round((usedBytes / quotaBytes) * 100)) : 100;
+}
+
+export function usageLevel(usedBytes: number, quotaBytes: number): UsageLevel {
+	if (usedBytes >= quotaBytes) return 'FULL';
+	return usagePercent(usedBytes, quotaBytes) >= STORAGE_WARNING_PERCENT ? 'WARNING' : 'OK';
+}
+
+/** Color of the usage gauge / badge. */
+export const usageLevelColor: Record<UsageLevel, 'primary' | 'warning' | 'danger'> = {
+	OK: 'primary',
+	WARNING: 'warning',
+	FULL: 'danger'
+};
+
+/** Badge of the usage share (organizations list). */
+export const usageBadgeVariant: Record<UsageLevel, 'default' | 'warning' | 'danger'> = {
+	OK: 'default',
+	WARNING: 'warning',
+	FULL: 'danger'
+};
+
 /** Offer label: storage is an option (DECISIONS.md §12). */
 export function offerLabel(storageEnabled: boolean): string {
 	return storageEnabled ? 'Accès + Stockage' : 'Accès';

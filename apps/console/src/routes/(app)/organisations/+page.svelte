@@ -26,7 +26,10 @@
 		formatBytes,
 		offerLabel,
 		orgRoleLabel,
-		quotaOptions
+		quotaOptions,
+		usageBadgeVariant,
+		usageLevel,
+		usagePercent
 	} from '$lib/records/organization';
 	import { organizationCreateSchema, organizationUpdateSchema } from '$lib/schemas/organization';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
@@ -135,7 +138,17 @@
 {/snippet}
 
 {#snippet quotaCell(org: OrganizationListItem)}
-	{org.storageEnabled ? formatBytes(org.quotaBytes) : '—'}
+	{#if org.storageEnabled}
+		<div class="usage">
+			<span>{formatBytes(org.usedBytes)} / {formatBytes(org.quotaBytes)}</span>
+			<Badge
+				label={`${usagePercent(org.usedBytes, org.quotaBytes)} %`}
+				variant={usageBadgeVariant[usageLevel(org.usedBytes, org.quotaBytes)]}
+			/>
+		</div>
+	{:else}
+		—
+	{/if}
 {/snippet}
 
 {#snippet roleCell(org: OrganizationListItem)}
@@ -202,7 +215,7 @@
 		columns={[
 			{ key: 'name', label: 'Organisation', cell: nameCell },
 			{ key: 'storageEnabled', label: 'Offre', cell: offerCell },
-			{ key: 'quotaBytes', label: 'Stockage', cell: quotaCell },
+			{ key: 'quotaBytes', label: 'Stockage (utilisé / forfait)', cell: quotaCell },
 			{ key: 'memberCount', label: 'Membres', align: 'right' },
 			{ key: 'applicationCount', label: 'Applications', align: 'right' },
 			{ key: 'myRole', label: 'Mon rôle', cell: roleCell },
@@ -316,6 +329,12 @@
 {/if}
 
 <style>
+	.usage {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
 	.name {
 		display: flex;
 		align-items: center;

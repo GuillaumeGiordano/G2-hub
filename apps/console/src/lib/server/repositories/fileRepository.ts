@@ -156,6 +156,34 @@ export async function usedBytes(organizationId: string, tx: Prisma.TransactionCl
 	return agg._sum.bytes ?? 0n;
 }
 
+/** What counts toward the quota, per application and kind (the « Stockage » page). Same rows as
+ *  `usedBytes`, so the breakdown always adds up to the total. */
+export async function usageBreakdown(organizationId: string) {
+	const rows = await prisma.storedFile.groupBy({
+		by: ['applicationId', 'kind'],
+		where: { organizationId },
+		_sum: { bytes: true },
+		_count: { _all: true }
+	});
+	return rows.map((r) => ({
+		applicationId: r.applicationId,
+		kind: r.kind,
+		bytes: r._sum.bytes ?? 0n,
+		files: r._count._all
+	}));
+}
+
+/** Bytes counted toward the quota for each of these organizations (lists, internal API). */
+export async function usedBytesByOrganization(organizationIds: string[]): Promise<Map<string, bigint>> {
+	if (organizationIds.length === 0) return new Map();
+	const rows = await prisma.storedFile.groupBy({
+		by: ['organizationId'],
+		where: { organizationId: { in: organizationIds } },
+		_sum: { bytes: true }
+	});
+	return new Map(rows.map((r) => [r.organizationId, r._sum.bytes ?? 0n]));
+}
+
 export function createUploadingFile(
 	tx: Prisma.TransactionClient,
 	data: {

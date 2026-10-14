@@ -23,6 +23,8 @@ const ORGANIZATIONS_PATH = '/organisations';
 
 /** The public API authenticates by API key (lib/server/api), never by session cookie. */
 const PUBLIC_API = '/api/v1/';
+/** The internal API (G2 WebDev portal) authenticates by the instance token, never by cookie either. */
+const INTERNAL_API = '/api/internal/';
 
 /** Called server-to-server by portals (no Origin), authenticated by the client secret — never by a
  *  cookie, so a cross-site form cannot abuse it. */
@@ -45,7 +47,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (crossSiteForm(event.request, event.url)) {
 		return new Response(`Cross-site ${event.request.method} form submissions are forbidden`, { status: 403 });
 	}
-	if (event.url.pathname.startsWith(PUBLIC_API)) {
+	if (event.url.pathname.startsWith(PUBLIC_API) || event.url.pathname.startsWith(INTERNAL_API)) {
 		event.locals.user = null;
 		event.locals.session = null;
 		event.locals.organization = null;

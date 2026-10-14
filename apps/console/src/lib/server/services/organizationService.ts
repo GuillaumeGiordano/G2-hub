@@ -36,7 +36,8 @@ export async function listOrganizations(
 		}),
 		orgRepo.countOrganizations(params.search, visibleTo)
 	]);
-	return { items: rows.map(toOrganizationListItem), total };
+	const used = await fileRepo.usedBytesByOrganization(rows.map((r) => r.id));
+	return { items: rows.map((r) => toOrganizationListItem(r, used.get(r.id) ?? 0n)), total };
 }
 
 /** A free slug derived from the name: "boulangerie", then "boulangerie-2", "-3"… */

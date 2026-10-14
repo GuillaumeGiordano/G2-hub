@@ -33,7 +33,7 @@
 	import { applicationTabs } from '$lib/records/navigation';
 	import Uploader from '$lib/components/files/Uploader.svelte';
 	import { fileKindLabel, fileStatusLabel, fileStatusVariant } from '$lib/records/files';
-	import { formatBytes } from '$lib/records/organization';
+	import { formatBytes, usageLevel, usageLevelColor, usagePercent } from '$lib/records/organization';
 	import { visibilityHint, visibilityLabel, visibilityOptions, visibilityVariant } from '$lib/records/storage';
 	import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
@@ -64,7 +64,8 @@
 		return () => clearInterval(timer);
 	});
 
-	const usagePercent = $derived(Math.min(100, Math.round((data.usage.usedBytes / data.usage.quotaBytes) * 100)));
+	const usedPercent = $derived(usagePercent(data.usage.usedBytes, data.usage.quotaBytes));
+	const usageColor = $derived(usageLevelColor[usageLevel(data.usage.usedBytes, data.usage.quotaBytes)]);
 	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' });
 
 	const CREATE_MODAL_ID = 'folder-create';
@@ -251,10 +252,10 @@
 
 	{#if b.storageEnabled}
 		<Progress
-			value={usagePercent}
+			value={usedPercent}
 			label={`Stockage : ${formatBytes(data.usage.usedBytes)} utilisés sur ${formatBytes(data.usage.quotaBytes)}`}
 			showValue
-			color={usagePercent >= 90 ? 'danger' : usagePercent >= 75 ? 'warning' : 'primary'}
+			color={usageColor}
 		/>
 	{/if}
 

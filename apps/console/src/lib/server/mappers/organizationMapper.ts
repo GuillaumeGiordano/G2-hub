@@ -14,13 +14,14 @@ type OrganizationListRow = OrganizationRow & {
 	memberships: { role: OrgRole }[];
 };
 
-export function toOrganizationListItem(row: OrganizationListRow): OrganizationListItem {
+export function toOrganizationListItem(row: OrganizationListRow, usedBytes: bigint): OrganizationListItem {
 	return {
 		id: row.id,
 		name: row.name,
 		slug: row.slug,
 		// BigInt does not serialize to the page; a quota (≤ 20 GB) fits a JS number exactly.
 		quotaBytes: Number(row.quotaBytes),
+		usedBytes: Number(usedBytes),
 		storageEnabled: row.storageEnabled,
 		memberCount: row._count.memberships,
 		applicationCount: row._count.applications,

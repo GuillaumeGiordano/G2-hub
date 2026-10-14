@@ -1,7 +1,7 @@
 // Single source of truth for the console navigation. The AppShell filters it for the current user
 // and renders the @guillaumeg/ui <Sidebar> (desktop) and the mobile drawer. Add a link HERE only.
 import type { Component } from 'svelte';
-import { AppWindow, Building2, LayoutDashboard, ShieldCheck, Users } from '@lucide/svelte';
+import { AppWindow, Building2, HardDrive, LayoutDashboard, ShieldCheck, Users } from '@lucide/svelte';
 
 /** What the current user can reach — decides which links show. */
 export type NavContext = {
@@ -9,6 +9,8 @@ export type NavContext = {
 	hasOrganization: boolean;
 	/** May manage the members of the active organization (owner or superadmin). */
 	canManageMembers: boolean;
+	/** The active organization subscribed to the storage option (« Accès + Stockage », §12). */
+	storageEnabled: boolean;
 };
 
 export type NavItem = {
@@ -39,6 +41,7 @@ export const NAV: NavSection[] = [
 		visible: (ctx) => ctx.hasOrganization,
 		items: [
 			{ label: 'Applications', href: '/applications', icon: AppWindow },
+			{ label: 'Stockage', href: '/stockage', icon: HardDrive, visible: (ctx) => ctx.storageEnabled },
 			{ label: 'Membres', href: '/membres', icon: Users, visible: (ctx) => ctx.canManageMembers }
 		]
 	},
