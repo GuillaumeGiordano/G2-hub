@@ -161,10 +161,14 @@ export type HubClient = {
 	/** One file by id (a publishable key only sees a READY file of a public folder). */
 	file(id: string): Promise<HubFile>;
 	/** The application's READY files, every folder together, newest first — what a « choose a media »
-	 *  picker lists. `q` searches the name; a publishable key only sees public files. */
-	media(params?: { q?: string; kind?: HubFileKind; page?: number; perPage?: number }): Promise<HubMediaListing>;
+	 *  picker lists. `q` searches the name; `folder` (an id) keeps that folder and its subfolders; a
+	 *  publishable key only sees public files. */
+	media(params?: { q?: string; kind?: HubFileKind; folder?: string; page?: number; perPage?: number }): Promise<HubMediaListing>;
 
 	// ── Secret key (server side) ──
+	/** Every folder of the application, flat, with its full path ("Galerie/Été"), sorted by path —
+	 *  what a « folder » select lists. */
+	folderTree(): Promise<{ folders: HubFolder[] }>;
 	/** Reserve an upload (type, size, quota checked) and get the signed URL to PUT the file to. */
 	createUpload(request: HubUploadRequest): Promise<HubUploadTicket>;
 	/** The file was PUT: process it. Image / PDF → READY; video → PROCESSING (poll `file(id)`). */
@@ -270,9 +274,11 @@ export function createHubClient(options: HubClientOptions): HubClient {
 			get<HubMediaListing>('media', {
 				q: params.q,
 				kind: params.kind,
+				folder: params.folder,
 				page: params.page ? String(params.page) : undefined,
 				perPage: params.perPage ? String(params.perPage) : undefined
 			}),
+		folderTree: () => get<{ folders: HubFolder[] }>('folders/tree'),
 		createUpload: (request) => send<HubUploadTicket>('POST', 'uploads', request),
 		completeUpload: (fileId) => send<HubFile>('POST', `uploads/${encodeURIComponent(fileId)}/complete`),
 		async uploadFile({ data, ...request }) {

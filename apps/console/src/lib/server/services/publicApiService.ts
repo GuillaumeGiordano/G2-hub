@@ -1,6 +1,6 @@
 import * as folderRepo from '$lib/server/repositories/folderRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
-import { ApiError, type ApiContext } from '$lib/server/api/auth';
+import { ApiError, requireSecret, type ApiContext } from '$lib/server/api/auth';
 import * as storage from '$lib/server/storage/s3';
 import type { StoredVariant } from '$lib/server/storage/purge';
 import type { Visibility } from '$lib/records/storage';
@@ -100,6 +100,25 @@ export async function listFolders(ctx: ApiContext, url: URL) {
 	};
 }
 
+/** GET /api/v1/folders/tree — every folder of the application, flat, with its full path, sorted by
+ *  path: what a site's « folder » select lists in one call. Secret key only: a private folder's
+ *  name would show in the path of a public subfolder. */
+export async function listFolderTree(ctx: ApiContext) {
+	assertStorage(ctx);
+	requireSecret(ctx);
+	const rows = await folderRepo.listAllFolders(ctx.organizationId, ctx.applicationId);
+	const byId = new Map(rows.map((r) => [r.id, r]));
+	const pathOfRow = (r: (typeof rows)[number]): string => {
+		const names = [r.name];
+		for (let p = r.parentId ? byId.get(r.parentId) : undefined; p; p = p.parentId ? byId.get(p.parentId) : undefined) {
+			names.unshift(p.name);
+		}
+		return names.join('/');
+	};
+	const folders: ApiFolder[] = rows.map((r) => ({ id: r.id, name: r.name, path: pathOfRow(r), visibility: r.visibility }));
+	return { folders: folders.sort((a, b) => a.path.localeCompare(b.path, 'fr')) };
+}
+
 async function versionUrl(visibility: Visibility, key: string): Promise<string> {
 	return visibility === 'PUBLIC' ? storage.publicUrl(key) : storage.presignDownload('PRIVATE', key, SIGNED_URL_SECONDS);
 }
@@ -138,14 +157,22 @@ export async function toApiFile(f: FileRow, kind: ApiContext['kind']): Promise<A
 	};
 }
 
-/** GET /api/v1/media — the application's READY files, every folder together, newest first: what a
- *  « choose a media » picker of a site's back-office lists (§23). Publishable key: public only. */
+/** GET /api/v1/media — the application's READY files, every folder together (or one folder and its
+ *  subfolders with `folder`), newest first: what a « choose a media » picker of a site's back-office
+ *  lists (§23). Publishable key: public only. */
 export async function listMedia(ctx: ApiContext, url: URL) {
 	assertStorage(ctx);
 	const parsed = apiMediaQuerySchema.safeParse(Object.fromEntries(url.searchParams));
 	if (!parsed.success) throw new ApiError(400, firstIssue(parsed.error));
-	const { q, kind, page, perPage } = parsed.data;
-	const filter = { kind, search: q || undefined, visibility: ctx.kind === 'PUBLISHABLE' ? ('PUBLIC' as const) : undefined };
+	const { q, kind, folder, page, perPage } = parsed.data;
+	// `folder` = that folder and its subfolders; a folder the key may not see is a 404.
+	const root = folder ? await resolveFolder(ctx, { folder }) : null;
+	const filter = {
+		kind,
+		search: q || undefined,
+		folderIds: root ? await folderRepo.listSubtreeIds(ctx.organizationId, root.id) : undefined,
+		visibility: ctx.kind === 'PUBLISHABLE' ? ('PUBLIC' as const) : undefined
+	};
 	const [rows, total] = await Promise.all([
 		fileRepo.searchMedia(ctx.organizationId, ctx.applicationId, filter, { skip: (page - 1) * perPage, take: perPage }),
 		fileRepo.countMedia(ctx.organizationId, ctx.applicationId, filter)

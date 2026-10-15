@@ -50,6 +50,8 @@ export const apiPinRefSchema = z
 export const apiMediaQuerySchema = z.object({
 	q: z.string().trim().max(200).optional(),
 	kind: z.enum(['IMAGE', 'VIDEO', 'PDF'], 'kind : IMAGE, VIDEO ou PDF').optional(),
+	/** A folder id: only that folder and its subfolders. */
+	folder: z.string().trim().min(1).optional(),
 	page: z.coerce.number('page invalide').int().min(1).default(1),
 	perPage: z.coerce.number('perPage invalide').int().min(1).max(100, 'perPage : 100 maximum').default(24)
 });

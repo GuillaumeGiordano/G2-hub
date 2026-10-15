@@ -18,7 +18,7 @@ export function findFolder(organizationId: string, id: string) {
 export function listAllFolders(organizationId: string, applicationId: string) {
 	return prisma.folder.findMany({
 		where: { organizationId, applicationId, ownerAppUserId: null },
-		select: { id: true, name: true, parentId: true }
+		select: { id: true, name: true, parentId: true, visibility: true }
 	});
 }
 
