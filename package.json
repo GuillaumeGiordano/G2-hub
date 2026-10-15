@@ -15,6 +15,8 @@
 		"db:deploy": "pnpm --filter @g2-hub/db run deploy",
 		"db:generate": "pnpm --filter @g2-hub/db generate",
 		"db:studio": "pnpm --filter @g2-hub/db studio",
-		"hub:install": "pnpm --filter console exec tsx scripts/install.ts"
+		"hub:install": "pnpm --filter console exec tsx scripts/install.ts",
+		"api:local": "cd bruno && pnpm dlx @usebruno/cli@2 run 1-lecture 2-envoi/01-reserver-envoi.bru 2-envoi/02-confirmer-envoi.bru 2-envoi/03-lire-fichier.bru 2-envoi/04-modifier-textes.bru 2-envoi/05-epingler.bru 2-envoi/06-supprimer-refuse.bru 2-envoi/07-liberer.bru 2-envoi/08-supprimer.bru 4-oidc --env Local",
+		"api:prod": "cd bruno && pnpm dlx @usebruno/cli@2 run 1-lecture 4-oidc --env Production"
 	}
 }
