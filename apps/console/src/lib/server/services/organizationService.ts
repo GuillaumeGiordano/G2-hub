@@ -19,6 +19,7 @@ import type {
 	ActiveOrganization,
 	CreatedOrganization,
 	MyOrganization,
+	MyOrganizationCard,
 	OrganizationListItem
 } from '$lib/viewmodels/organization';
 
@@ -115,9 +116,15 @@ export async function deleteOrganization(actor: Actor, id: string): Promise<stri
 	return org.name;
 }
 
-/** The organizations a member may switch to (« Choisir une organisation »). */
-export function myOrganizations(actor: Actor) {
-	return orgRepo.listOrganizationsOfUser(actor.id);
+/** « Mes organisations »: the organizations of a member, as cards (§36). */
+export async function myOrganizations(actor: Actor): Promise<MyOrganizationCard[]> {
+	const rows = await orgRepo.listOrganizationsOfUser(actor.id);
+	return rows.map((r) => ({
+		id: r.id,
+		name: r.name,
+		logoUrl: r.logoKey ? storage.publicUrl(r.logoKey) : null,
+		applicationCount: r._count.applications
+	}));
 }
 
 /** « Mon organisation »: the active organization's summary (every member). */
@@ -267,14 +274,4 @@ export async function organizationOfApplication(
 	const organizationId = await orgRepo.findOrganizationIdOfApplication(applicationId);
 	if (!organizationId) return null;
 	return actor.isSuperadmin || memberships.some((m) => m.organizationId === organizationId) ? organizationId : null;
-}
-
-/** Switch the session to `organizationId` — only to an organization the actor may see. */
-export async function switchOrganization(sessionId: string, actor: Actor, organizationId: string): Promise<string> {
-	const org = await orgRepo.findOrganizationById(organizationId);
-	const member = org ? await membershipRepo.findMembership(organizationId, actor.id) : null;
-	// 404, not 403: never reveal that an organization exists elsewhere (DECISIONS.md §13).
-	if (!org || (!member && !actor.isSuperadmin)) throw notFound('Organisation introuvable.');
-	await sessionRepo.setActiveOrganization(sessionId, org.id);
-	return org.name;
 }

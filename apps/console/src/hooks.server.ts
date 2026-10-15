@@ -66,6 +66,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.organization = null;
 	event.locals.orgContext = null;
 	event.locals.requiresTwoFactor = false;
+	event.locals.membershipCount = 0;
 
 	if (session) {
 		// The active organization comes from the SESSION, re-checked against the memberships on
@@ -82,6 +83,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			? { userId: actor.id, isSuperadmin: actor.isSuperadmin, organization }
 			: null;
 		event.locals.requiresTwoFactor = requiresTwoFactor(session.user.role, memberships.length > 0);
+		event.locals.membershipCount = memberships.length;
 	}
 
 	const routeId = event.route.id ?? '';

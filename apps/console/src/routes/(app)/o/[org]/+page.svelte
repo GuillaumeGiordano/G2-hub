@@ -52,7 +52,7 @@
 				: "Vous n'êtes membre d'aucune organisation pour le moment."}
 			cta={data.isSuperadmin
 				? { label: 'Voir les organisations', href: '/organisations' }
-				: { label: 'Choisir une organisation', href: '/choisir-organisation' }}
+				: { label: 'Mes organisations', href: '/mes-organisations' }}
 		/>
 	{/if}
 </div>

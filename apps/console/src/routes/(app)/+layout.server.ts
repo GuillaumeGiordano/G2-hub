@@ -15,6 +15,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		isSuperadmin: superadmin,
 		hasOrganization: !!organization,
 		organizationId: organization?.id ?? null,
+		membershipCount: locals.membershipCount,
 		applicationCount: apps.length,
 		singleApplicationId: apps.length === 1 ? apps[0] : null
 	};

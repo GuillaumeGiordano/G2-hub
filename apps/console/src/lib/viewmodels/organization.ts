@@ -99,3 +99,11 @@ export type OrganizationContract = {
 	contractStartedAt: string | null;
 	internalNotes: string | null;
 };
+
+/** A card of « Mes organisations » (an Admin of several organizations, §36). */
+export type MyOrganizationCard = {
+	id: string;
+	name: string;
+	logoUrl: string | null;
+	applicationCount: number;
+};

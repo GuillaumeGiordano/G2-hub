@@ -51,12 +51,12 @@ export function searchOrganizations(params: {
 	});
 }
 
-/** The organizations a user belongs to (names only: what the « choose » page lists). */
+/** The organizations a user belongs to — what « Mes organisations » shows (name, logo, size). */
 export function listOrganizationsOfUser(userId: string) {
 	return prisma.organization.findMany({
 		where: { memberships: { some: { userId } } },
 		orderBy: { name: 'asc' },
-		select: { id: true, name: true }
+		select: { id: true, name: true, logoKey: true, _count: { select: { applications: true } } }
 	});
 }
 

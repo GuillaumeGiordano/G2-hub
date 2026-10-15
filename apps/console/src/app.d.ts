@@ -16,6 +16,8 @@ declare global {
 			orgContext: OrgContext | null;
 			/** Mandatory 2FA applies to this account (superadmin, or Admin of an organization). */
 			requiresTwoFactor: boolean;
+			/** How many organizations the account is a member of (several = « Mes organisations »). */
+			membershipCount: number;
 		}
 	}
 }

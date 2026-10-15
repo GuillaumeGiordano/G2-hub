@@ -12,6 +12,8 @@ export type NavContext = {
 	hasOrganization: boolean;
 	/** Its id: the organization's pages live under /o/<id>/… */
 	organizationId: string | null;
+	/** How many organizations the account belongs to (an Admin of several gets « Mes organisations »). */
+	membershipCount: number;
 	/** How many applications the active organization has. */
 	applicationCount: number;
 	/** Its only application, when it has exactly one (« Mon application » opens it). */
@@ -42,6 +44,13 @@ export const NAV: NavSection[] = [
 		items: [
 			// An Admin's dashboard is its organization's; the superadmin's is the console's.
 			{ label: 'Tableau de bord', href: dashboardHref, icon: LayoutDashboard, match: 'exact' },
+			// The rare Admin of several organizations switches here (§36), with or without one open.
+			{
+				label: 'Mes organisations',
+				href: '/mes-organisations',
+				icon: Building2,
+				visible: (ctx) => !ctx.isSuperadmin && ctx.membershipCount > 1
+			},
 			{
 				label: 'Organisations',
 				href: '/organisations',

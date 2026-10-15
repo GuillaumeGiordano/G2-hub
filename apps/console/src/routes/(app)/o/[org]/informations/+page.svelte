@@ -69,7 +69,7 @@
 		<Badge label={org.role ? orgRoleLabel[org.role] : SUPERADMIN_LABEL} variant="info" />
 		<Badge label={organizationStatusLabel[org.contract.status]} variant={organizationStatusVariant[org.contract.status]} />
 		{#if org.canSwitch}
-			<Button variant="outline" icon={ArrowLeftRight} href="/choisir-organisation">Changer d'organisation</Button>
+			<Button variant="outline" icon={ArrowLeftRight} href="/mes-organisations">Changer d'organisation</Button>
 		{/if}
 	</SuperTitle>
 	{#if !org.isSuperadmin}<PageTabs tabs={organizationTabs(org.id)} />{/if}
