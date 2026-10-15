@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import {
 		Alert,
 		Badge,
@@ -28,6 +29,7 @@
 		Pencil,
 		Trash2
 	} from '@lucide/svelte';
+	import MediaViewer from '$lib/components/media/MediaViewer.svelte';
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { applicationTabs } from '$lib/records/navigation';
@@ -55,6 +57,23 @@
 		...b.crumbs.map((c) => ({ label: c.name, href: folderHref(c.id) })),
 		...(b.folder ? [{ label: b.folder.name }] : [])
 	]);
+
+	/** The current URL with `media` set (or removed when null): the viewer of one file. */
+	function withMedia(id: string | null): string {
+		const params = new URLSearchParams(page.url.searchParams);
+		if (id) params.set('media', id);
+		else params.delete('media');
+		const qs = params.toString();
+		return qs ? `?${qs}` : page.url.pathname;
+	}
+
+	// The viewer moves between the READY files of the current folder.
+	const viewable = $derived(data.files.filter((f) => f.status === 'READY'));
+	const viewIndex = $derived(data.media ? viewable.findIndex((f) => f.id === data.media!.id) : -1);
+	const prevHref = $derived(viewIndex > 0 ? withMedia(viewable[viewIndex - 1].id) : null);
+	const nextHref = $derived(
+		viewIndex >= 0 && viewIndex < viewable.length - 1 ? withMedia(viewable[viewIndex + 1].id) : null
+	);
 
 	// While a video is being transcoded in the background, refresh the list until it is ready.
 	const processing = $derived(data.files.some((f) => f.status === 'PROCESSING'));
@@ -172,7 +191,11 @@
 {/snippet}
 
 {#snippet fileNameCell(file: FileListItem)}
-	<div class="strong file-name">{file.name}</div>
+	{#if file.status === 'READY'}
+		<a class="strong file-name file-link" href={withMedia(file.id)} data-sveltekit-noscroll>{file.name}</a>
+	{:else}
+		<div class="strong file-name">{file.name}</div>
+	{/if}
 	<div class="slug">
 		{fileKindLabel[file.kind]}{file.width ? ` · ${file.width} × ${file.height}` : ''}
 	</div>
@@ -304,6 +327,15 @@
 	{/if}
 </div>
 
+<MediaViewer
+	media={data.media}
+	applicationId={b.application.id}
+	{prevHref}
+	{nextHref}
+	closeHref={withMedia(null)}
+	canWrite={b.canWrite}
+/>
+
 <Modal id={CREATE_MODAL_ID} title="Nouveau dossier">
 	<form
 		method="POST"
@@ -426,6 +458,15 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.file-link {
+		display: block;
+		color: var(--text-heading);
+		text-decoration: none;
+	}
+	.file-link:hover {
+		color: var(--primary);
+		text-decoration: underline;
 	}
 	.file-error {
 		font-size: 12px;

@@ -1,7 +1,7 @@
 import type { FileKind } from '$lib/records/files';
 import type { Visibility } from '$lib/records/storage';
 
-/** One media of the library (a READY file) with everything the grid and the viewer need. */
+/** One READY file with everything the Files tab's viewer needs. */
 export type MediaItem = {
 	id: string;
 	name: string;
@@ -29,19 +29,4 @@ export type MediaItem = {
 	downloadUrl: string;
 	/** Stable public URL to paste into a site — public files only. */
 	publicUrl: string | null;
-};
-
-/** A folder of the filter, labelled with its full path ("Galerie / 2026"). */
-export type MediaFolderOption = { value: string; label: string };
-
-export type MediaLibrary = {
-	application: { id: string; name: string };
-	items: MediaItem[];
-	total: number;
-	page: number;
-	perPage: number;
-	folders: MediaFolderOption[];
-	/** May delete media (Admins). */
-	canWrite: boolean;
-	storageEnabled: boolean;
 };

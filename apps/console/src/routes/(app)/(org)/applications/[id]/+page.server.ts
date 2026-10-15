@@ -2,26 +2,31 @@ import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { parseForm, requiredString } from '$lib/validation';
 import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
+import { fileTextSchema } from '$lib/schemas/fileText';
 import { actionFailure, loadFailure } from '$lib/server/http';
 import { can } from '$lib/records/organization';
 import * as folderService from '$lib/server/services/folderService';
 import * as fileService from '$lib/server/services/fileService';
+import * as mediaService from '$lib/server/services/mediaService';
 import type { Actions, PageServerLoad } from './$types';
 
-// File browser of one application. The current folder lives in the URL (`?dossier=`): shareable,
-// back-button friendly. Every id is re-checked against the session's organization by the services.
+// File browser of one application. The current folder and the file open in the viewer live in the
+// URL (`?dossier=&media=`): shareable, back-button friendly. Every id is re-checked against the
+// session's organization by the services.
 const idSchema = z.object({ id: requiredString() });
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const ctx = locals.orgContext!;
 	try {
 		const browser = await folderService.browse(ctx, params.id, url.searchParams.get('dossier'));
-		const [files, usage] = await Promise.all([
+		const mediaId = url.searchParams.get('media');
+		const [files, usage, media] = await Promise.all([
 			browser.folder ? fileService.listFiles(ctx, browser.folder.id) : Promise.resolve([]),
-			fileService.usage(ctx)
+			fileService.usage(ctx),
+			mediaId ? mediaService.getMedia(ctx, params.id, mediaId) : Promise.resolve(null)
 		]);
 		const canManageKeys = can(ctx.organization.role, ctx.isSuperadmin, 'applications.manage');
-		return { browser, files, usage, canManageKeys };
+		return { browser, files, usage, media, canManageKeys };
 	} catch (err) {
 		loadFailure(err);
 	}
@@ -55,6 +60,18 @@ export const actions: Actions = {
 		try {
 			await folderService.deleteFolder(locals.orgContext!, params.id, parsed.data.id);
 			return { deleted: true };
+		} catch (err) {
+			return actionFailure(err);
+		}
+	},
+
+	updateText: async ({ request, locals, params }) => {
+		const parsed = parseForm(await request.formData(), fileTextSchema);
+		if (!parsed.success) return fail(400, { errors: parsed.errors });
+		try {
+			const { id, alt, caption } = parsed.data;
+			await fileService.updateFileText(locals.orgContext!, params.id, id, { alt: alt ?? null, caption: caption ?? null });
+			return { saved: true };
 		} catch (err) {
 			return actionFailure(err);
 		}
