@@ -1,6 +1,6 @@
 import type { Mail } from './mailer';
 
-// The e-mails sent to application users. Plain text + a minimal HTML version (inline styles: mail
+// The e-mails sent to application users and console accounts. Plain text + a minimal HTML version (inline styles: mail
 // clients ignore style sheets). Every inserted value is escaped — an application name is typed by
 // a client.
 
@@ -44,6 +44,19 @@ export function passwordResetMail(c: Context & { validMinutes: number }): Mail {
 	return {
 		to: c.to,
 		subject: `Nouveau mot de passe — ${c.applicationName}`,
+		text: `${intro}\n\n${body}\n\n${c.link}\n\n${footer}\n`,
+		html: layout([intro, body], { label: 'Choisir un nouveau mot de passe', url: c.link }, footer)
+	};
+}
+
+/** A console account's « mot de passe oublié » (requested on the login page or by an Admin). */
+export function consolePasswordResetMail(c: { to: string; name: string; hubName: string; link: string; validMinutes: number }): Mail {
+	const intro = `Bonjour ${c.name},`;
+	const body = `Un nouveau mot de passe a été demandé pour votre compte de la console ${c.hubName}.`;
+	const footer = `Ce lien est valable ${c.validMinutes} minutes et ne sert qu'une fois. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.`;
+	return {
+		to: c.to,
+		subject: `Nouveau mot de passe — ${c.hubName}`,
 		text: `${intro}\n\n${body}\n\n${c.link}\n\n${footer}\n`,
 		html: layout([intro, body], { label: 'Choisir un nouveau mot de passe', url: c.link }, footer)
 	};

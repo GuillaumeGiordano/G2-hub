@@ -51,6 +51,7 @@
 		<Input bind:value={password} label="Mot de passe" required type="password" />
 
 		<Button addClass="w-full" {loading} size="lg" type="submit">Se connecter</Button>
+		<a class="forgot" href="/login/mot-de-passe-oublie">Mot de passe oublié ?</a>
 	</form>
 </div>
 
@@ -81,6 +82,11 @@
 		color: var(--text-heading);
 	}
 	.sub {
+		font-size: 13px;
+		color: var(--text-muted);
+	}
+	.forgot {
+		align-self: center;
 		font-size: 13px;
 		color: var(--text-muted);
 	}

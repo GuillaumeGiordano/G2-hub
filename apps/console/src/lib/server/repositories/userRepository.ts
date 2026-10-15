@@ -33,6 +33,22 @@ export function createUserWithPassword(
 }
 
 /** Delete an account (its sessions, credential and memberships cascade). */
+/** How many reset links (Better Auth `verification` rows) were created for the user since `since`. */
+export function countResetLinksSince(userId: string, since: Date) {
+	return prisma.verification.count({
+		where: { value: userId, identifier: { startsWith: 'reset-password:' }, createdAt: { gte: since } }
+	});
+}
+
+/** Is this reset link (Better Auth token) still usable? */
+export async function resetLinkIsValid(token: string) {
+	const row = await prisma.verification.findFirst({
+		where: { identifier: `reset-password:${token}`, expiresAt: { gt: new Date() } },
+		select: { id: true }
+	});
+	return !!row;
+}
+
 export function deleteUser(id: string, tx: Prisma.TransactionClient = prisma) {
 	return tx.user.delete({ where: { id }, select: { id: true } });
 }

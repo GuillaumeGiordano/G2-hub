@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
 import type { Prisma } from '@g2-hub/db';
+import { APIError } from 'better-auth/api';
 import { auth } from '$lib/server/auth';
+import { HubError } from '$lib/server/errors';
 import * as userRepo from '$lib/server/repositories/userRepository';
 
 // Console accounts created by an operator (no public sign-up, no SMTP yet): a new account gets a
@@ -28,4 +30,23 @@ export async function ensureAccount(
 	const passwordHash = await (await auth.$context).password.hash(temporaryPassword);
 	const user = await userRepo.createUserWithPassword({ name: person.name.trim(), email, passwordHash }, tx);
 	return { userId: user.id, temporaryPassword };
+}
+
+/** « Mot de passe oublié » of a console account: e-mail a reset link (sent by auth.ts). Always
+ *  answers the same way: nobody learns whether an address has an account. */
+export async function requestPasswordReset(email: string): Promise<void> {
+	await auth.api.requestPasswordReset({ body: { email: email.trim().toLowerCase() } });
+}
+
+/** Is a reset link still usable (shown before asking for the new password)? */
+export const resetLinkIsValid = (token: string) => (token ? userRepo.resetLinkIsValid(token) : Promise.resolve(false));
+
+/** Set the new password from a reset link. Every session of the account is revoked (auth.ts). */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+	try {
+		await auth.api.resetPassword({ body: { token, newPassword } });
+	} catch (err) {
+		if (err instanceof APIError) throw new HubError('Ce lien est invalide ou a expiré.');
+		throw err;
+	}
 }
