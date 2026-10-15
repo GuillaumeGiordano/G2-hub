@@ -2,7 +2,7 @@
 // and renders the @guillaumeg/ui <Sidebar> (desktop) and the mobile drawer. Add a link HERE only.
 import type { Component } from 'svelte';
 import { orgPath } from '$lib/utils/orgPath';
-import { AppWindow, Building, Building2, LayoutDashboard, ShieldCheck, Users } from '@lucide/svelte';
+import { AppWindow, Building, Building2, LayoutDashboard, ShieldCheck } from '@lucide/svelte';
 
 /** What the current user can reach — decides which links show. */
 export type NavContext = {
@@ -25,6 +25,8 @@ export type NavItem = {
 	icon: Component;
 	/** How the active state is computed from the current path. Default: 'prefix'. */
 	match?: 'exact' | 'prefix';
+	/** Other paths that light the item up (« Organisations » while an organization is open). */
+	alsoActive?: string[];
 	visible?: (ctx: NavContext) => boolean;
 };
 
@@ -40,17 +42,23 @@ export const NAV: NavSection[] = [
 		items: [
 			// An Admin's dashboard is its organization's; the superadmin's is the console's.
 			{ label: 'Tableau de bord', href: dashboardHref, icon: LayoutDashboard, match: 'exact' },
-			{ label: 'Organisations', href: '/organisations', icon: Building2, visible: (ctx) => ctx.isSuperadmin }
+			{
+				label: 'Organisations',
+				href: '/organisations',
+				icon: Building2,
+				visible: (ctx) => ctx.isSuperadmin,
+				alsoActive: ['/o']
+			}
 		]
 	},
 	{
+		// An Admin's organization. The superadmin reaches an organization's pages through its tabs (§34).
 		label: 'Organisation',
-		visible: (ctx) => ctx.hasOrganization,
+		visible: (ctx) => ctx.hasOrganization && !ctx.isSuperadmin,
 		items: [
 			{ label: 'Mon organisation', href: (ctx) => orgPath(ctx.organizationId!, '/informations'), icon: Building },
 			{ label: applicationsLabel, href: applicationsHref, icon: AppWindow },
 			// Console accounts are the superadmin's (§32).
-			{ label: 'Membres', href: (ctx) => orgPath(ctx.organizationId!, '/membres'), icon: Users, visible: (ctx) => ctx.isSuperadmin }
 		]
 	},
 	{
@@ -104,13 +112,26 @@ export function applicationTabs(organizationId: string, applicationId: string, c
 }
 
 /** True when a nav item (resolved href) matches the current path. */
-export function isNavItemActive(item: { href: string; match?: NavItem['match'] }, pathname: string): boolean {
-	return item.match === 'exact'
-		? pathname === item.href
-		: pathname === item.href || pathname.startsWith(item.href + '/');
+export function isNavItemActive(
+	item: { href: string; match?: NavItem['match']; alsoActive?: string[] },
+	pathname: string
+): boolean {
+	const under = (href: string) => pathname === href || pathname.startsWith(href + '/');
+	if (item.alsoActive?.some(under)) return true;
+	return item.match === 'exact' ? pathname === item.href : under(item.href);
 }
 
-/** Tabs of « Mon organisation » (§33). */
+/** Tabs of an organization for the superadmin (§34): its pages, under its header. */
+export function superadminOrganizationTabs(organizationId: string) {
+	return [
+		{ label: 'Informations', href: orgPath(organizationId, '/informations') },
+		{ label: 'Membres', href: orgPath(organizationId, '/membres') },
+		{ label: 'Applications', href: orgPath(organizationId, '/applications') },
+		{ label: 'Stockage', href: orgPath(organizationId) }
+	];
+}
+
+/** Tabs of « Mon organisation » for an Admin (§33). */
 export function organizationTabs(organizationId: string) {
 	return [
 		{ label: 'Informations', href: orgPath(organizationId, '/informations') },

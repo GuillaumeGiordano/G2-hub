@@ -3,7 +3,10 @@ import type { OrgRole } from '$lib/records/organization';
 import { prisma } from '$lib/server/db';
 
 // Memberships — Prisma queries only. Every write is scoped by organization: an id that belongs to
-// another organization matches nothing (tenant isolation, DECISIONS.md §13).
+// another organization matches nothing (tenant isolation, DECISIONS.md §13). The superadmin's own
+// memberships are never listed nor counted: it is invisible to the organizations (§34).
+
+const NOT_SUPERADMIN = { role: { not: 'superadmin' } };
 
 /** All the organizations a user belongs to, with its role in each. */
 export function findMembershipsOfUser(userId: string) {
@@ -25,14 +28,15 @@ export function listMembers(organizationId: string, search?: string) {
 	return prisma.membership.findMany({
 		where: {
 			organizationId,
-			...(search && {
-				user: {
+			user: {
+				...NOT_SUPERADMIN,
+				...(search && {
 					OR: [
 						{ name: { contains: search, mode: 'insensitive' } },
 						{ email: { contains: search, mode: 'insensitive' } }
 					]
-				}
-			})
+				})
+			}
 		},
 		orderBy: [{ role: 'asc' }, { user: { name: 'asc' } }],
 		select: {
@@ -66,12 +70,12 @@ export function findMemberInOrganization(organizationId: string, membershipId: s
 }
 
 export function countOwners(organizationId: string) {
-	return prisma.membership.count({ where: { organizationId, role: 'OWNER' } });
+	return prisma.membership.count({ where: { organizationId, role: 'OWNER', user: NOT_SUPERADMIN } });
 }
 
 /** Admins whose account is not disabled: an organization always keeps at least one. */
 export function countActiveOwners(organizationId: string) {
-	return prisma.membership.count({ where: { organizationId, role: 'OWNER', user: { disabledAt: null } } });
+	return prisma.membership.count({ where: { organizationId, role: 'OWNER', user: { ...NOT_SUPERADMIN, disabledAt: null } } });
 }
 
 export function countMembershipsOfUser(userId: string, tx: Prisma.TransactionClient = prisma) {

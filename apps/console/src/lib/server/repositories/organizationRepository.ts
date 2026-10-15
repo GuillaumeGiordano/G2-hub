@@ -38,7 +38,14 @@ export function searchOrganizations(params: {
 			quotaBytes: true,
 			storageEnabled: true,
 			status: true,
-			_count: { select: { memberships: true, applications: true, files: { where: { source: 'API' } } } },
+			// The superadmin is never counted among an organization's members (§34).
+			_count: {
+				select: {
+					memberships: { where: { user: { role: { not: 'superadmin' } } } },
+					applications: true,
+					files: { where: { source: 'API' } }
+				}
+			},
 			memberships: { where: { userId: params.userId }, select: { role: true } }
 		}
 	});
@@ -57,7 +64,7 @@ export function listOrganizationsOfUser(userId: string) {
 export async function countsOf(id: string) {
 	const row = await prisma.organization.findUnique({
 		where: { id },
-		select: { _count: { select: { applications: true, memberships: true } } }
+		select: { _count: { select: { applications: true, memberships: { where: { user: { role: { not: 'superadmin' } } } } } } }
 	});
 	return { applications: row?._count.applications ?? 0, members: row?._count.memberships ?? 0 };
 }

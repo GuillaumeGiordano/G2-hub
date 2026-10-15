@@ -6,7 +6,6 @@ import { isSuperadmin } from '$lib/records/roles';
 import { DEFAULT_PER_PAGE } from '$lib/constants';
 import { actionFailure } from '$lib/server/http';
 import * as organizationService from '$lib/server/services/organizationService';
-import { orgPath } from '$lib/utils/orgPath';
 import type { Actions, PageServerLoad } from './$types';
 
 const idSchema = z.object({ id: requiredString() });
@@ -61,17 +60,5 @@ export const actions: Actions = {
 		} catch (err) {
 			return actionFailure(err);
 		}
-	},
-
-	/** Work in this organization: stored on the session after checking the membership. */
-	open: async ({ request, locals }) => {
-		const parsed = parseForm(await request.formData(), idSchema);
-		if (!parsed.success) return fail(400, { message: 'Organisation introuvable.' });
-		try {
-			await organizationService.switchOrganization(locals.session!.id, actorOf(locals), parsed.data.id);
-		} catch (err) {
-			return actionFailure(err);
-		}
-		redirect(303, orgPath(parsed.data.id));
 	}
 };

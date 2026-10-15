@@ -72,7 +72,7 @@
 			<Button variant="outline" icon={ArrowLeftRight} href="/choisir-organisation">Changer d'organisation</Button>
 		{/if}
 	</SuperTitle>
-	<PageTabs tabs={organizationTabs(org.id)} />
+	{#if !org.isSuperadmin}<PageTabs tabs={organizationTabs(org.id)} />{/if}
 
 	<div class="top">
 		<Card>

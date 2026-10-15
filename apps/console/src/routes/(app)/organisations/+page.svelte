@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { orgPath } from '$lib/utils/orgPath';
 	import { navigating, page } from '$app/state';
 	import {
 		Alert,
@@ -17,7 +17,7 @@
 		Switch,
 		Table
 	} from '@guillaumeg/ui';
-	import { EllipsisVertical, LogIn, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { ArrowRight, EllipsisVertical, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { PER_PAGE_OPTIONS } from '$lib/constants';
 	import {
@@ -26,7 +26,6 @@
 		offerLabel,
 		organizationStatusLabel,
 		organizationStatusVariant,
-		orgRoleLabel,
 		quotaOptions,
 		usageBadgeVariant,
 		usageLevel,
@@ -41,7 +40,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const isSuperadmin = $derived(page.data.isSuperadmin as boolean);
-	const activeOrgId = $derived((page.data.organization as { id: string } | null)?.id ?? null);
 	const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.perPage)));
 
 	const FORM_MODAL_ID = 'organization-form';
@@ -62,9 +60,6 @@
 
 	let toDelete = $state<OrganizationListItem | null>(null);
 
-	// « Ouvrir » submits one hidden form with the chosen id.
-	let openForm: HTMLFormElement | undefined = $state();
-	let openId = $state('');
 
 	function modal(id: string) {
 		return document.getElementById(id) as HTMLDialogElement | null;
@@ -106,11 +101,6 @@
 		modal(DELETE_MODAL_ID)?.showModal();
 	}
 
-	async function switchTo(org: OrganizationListItem) {
-		openId = org.id;
-		await tick();
-		openForm?.requestSubmit();
-	}
 
 	/** After a creation: say where the owner's invitation went (a new account gets one). */
 	function savedMessage(d: Record<string, unknown>): string {
@@ -124,8 +114,7 @@
 
 {#snippet nameCell(org: OrganizationListItem)}
 	<div class="name">
-		<span class="strong">{org.name}</span>
-		{#if org.id === activeOrgId}<Badge label="Active" variant="success" />{/if}
+		<a class="strong org-link" href={orgPath(org.id)}>{org.name}</a>
 		{#if org.status === 'SUSPENDED'}<Badge label={organizationStatusLabel.SUSPENDED} variant={organizationStatusVariant.SUSPENDED} />{/if}
 	</div>
 	<div class="slug">{org.slug}</div>
@@ -149,20 +138,17 @@
 	{/if}
 {/snippet}
 
-{#snippet roleCell(org: OrganizationListItem)}
-	{org.myRole ? orgRoleLabel[org.myRole] : '—'}
-{/snippet}
 
 {#snippet actionsCell(org: OrganizationListItem)}
 	<div class="actions">
 		<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
 			{#snippet items(close)}
 				<ButtonActionItem
-					label="Travailler dans cette organisation"
-					icon={LogIn}
+					label="Ouvrir"
+					icon={ArrowRight}
 					onclick={() => {
-						switchTo(org);
 						close();
+						goto(orgPath(org.id));
 					}}
 				/>
 				{#if isSuperadmin}
@@ -216,7 +202,6 @@
 			{ key: 'quotaBytes', label: 'Stockage (utilisé / forfait)', cell: quotaCell },
 			{ key: 'memberCount', label: 'Membres', align: 'right' },
 			{ key: 'applicationCount', label: 'Applications', align: 'right' },
-			{ key: 'myRole', label: 'Mon rôle', cell: roleCell },
 			{ key: 'id', label: '', align: 'right', cell: actionsCell }
 		]}
 	/>
@@ -234,9 +219,6 @@
 	</div>
 </div>
 
-<form bind:this={openForm} method="POST" action="?/open" use:enhance hidden>
-	<input type="hidden" name="id" value={openId} />
-</form>
 
 <Modal id={FORM_MODAL_ID} title={editing ? "Modifier l'organisation" : 'Nouvelle organisation'}>
 	<form
@@ -323,6 +305,14 @@
 </Modal>
 
 <style>
+	.org-link {
+		color: var(--text-heading);
+		text-decoration: none;
+	}
+	.org-link:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
 	.usage {
 		display: flex;
 		align-items: center;

@@ -30,7 +30,8 @@
 				.filter((item) => item.visible?.(nav) ?? true)
 				.map((item) => {
 					const { label, href } = resolveNavItem(item, nav);
-					return { label, href, icon: item.icon, active: isNavItemActive({ href, match: item.match }, page.url.pathname) };
+					const active = isNavItemActive({ href, match: item.match, alsoActive: item.alsoActive }, page.url.pathname);
+					return { label, href, icon: item.icon, active };
 				})
 		}))
 	);
