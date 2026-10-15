@@ -10,6 +10,8 @@ export type AppUserListItem = {
 	/** Still invited, and the last invitation link has expired: send it again. */
 	invitationExpired: boolean;
 	lastLoginAt: Date | null;
+	/** Holds an access token still valid: signed in to the portal within the last hour. */
+	signedIn: boolean;
 	createdAt: Date;
 	/** What their personal space holds (§28) — its content is never shown in the console. */
 	personalBytes: number;

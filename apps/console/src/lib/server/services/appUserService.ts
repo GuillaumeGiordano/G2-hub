@@ -188,21 +188,76 @@ export async function setAppUserDisabled(
 	return user.email;
 }
 
-/** Change the role. Codes and access tokens already issued are revoked: they would otherwise keep
- *  the former role for up to an hour (the portal then asks the user to sign in again). */
-export async function changeAppUserRole(
+/**
+ * Edit the account: name, e-mail, role. A new e-mail or role revokes the codes and access tokens
+ * already issued: they carry the former claims for up to an hour (the portal then asks the user to
+ * sign in again). A pending invitation went to the former address: it stops working, and the
+ * console offers to send it again.
+ */
+export async function updateAppUser(
 	ctx: OrgContext,
 	applicationId: string,
 	id: string,
-	role: AppUserRole
-): Promise<string> {
+	input: { name: string; email: string; role: AppUserRole }
+): Promise<{ email: string; invitationRevoked: boolean }> {
 	assertCan(ctx, 'appUsers.manage');
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
-	if (user.role === role) return user.email;
-	await userRepo.setRole(ctx.organization.id, applicationId, user.id, role);
+	const email = normalizeEmail(input.email);
+	const emailChanged = email !== user.email;
+	try {
+		await userRepo.updateAppUser(ctx.organization.id, applicationId, user.id, { name: input.name, email, role: input.role });
+	} catch (err) {
+		if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+			throw new HubError('Cette adresse a déjà un compte dans cette application.', { field: 'email' });
+		}
+		throw err;
+	}
+	if (emailChanged || input.role !== user.role) await userRepo.revokeGrants(user.id);
+	const invitationRevoked = emailChanged && appUserStatus(user) === 'INVITED';
+	if (invitationRevoked) await userRepo.revokeTokens(user.id, 'INVITATION');
+	return { email, invitationRevoked };
+}
+
+/** « Révoquer les sessions »: every sign-in code and access token stops working at once. The hub
+ *  keeps no portal session of its own: the portal gets a 401 and signs the user in again. */
+export async function revokeAppUserSessions(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
+	assertCan(ctx, 'appUsers.manage');
+	await applicationOrThrow(ctx, applicationId);
+	const user = await appUserOrThrow(ctx, applicationId, id);
 	await userRepo.revokeGrants(user.id);
 	return user.email;
+}
+
+/** « Réinitialiser le mot de passe »: e-mail the user a link to choose a new one. The Admin never
+ *  sees nor sets a password; the current one keeps working until the user uses the link. */
+export async function sendAppUserPasswordReset(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
+	assertCan(ctx, 'appUsers.manage');
+	const app = await applicationOrThrow(ctx, applicationId);
+	const user = await appUserOrThrow(ctx, applicationId, id);
+	const status = appUserStatus(user);
+	if (status === 'DISABLED') throw new HubError("Ce compte est désactivé : réactivez-le d'abord.");
+	if (status === 'INVITED') throw new HubError("Pas encore de mot de passe : utilisez « Renvoyer l'invitation ».");
+	if (await userRepo.sentTokenSince(user.id, 'PASSWORD_RESET', new Date(Date.now() - RESET_THROTTLE_MS))) {
+		throw new HubError('Un lien vient déjà de lui être envoyé : réessayez dans 2 minutes.');
+	}
+	await sendPasswordResetLink(user, app.name);
+	return user.email;
+}
+
+/** A new reset link (the previous ones stop working), e-mailed. */
+async function sendPasswordResetLink(user: { id: string; name: string; email: string }, applicationName: string) {
+	const link = newLink();
+	await prisma.$transaction(async (tx) => {
+		await userRepo.revokeTokens(user.id, 'PASSWORD_RESET', tx);
+		await userRepo.createToken(
+			{ appUserId: user.id, purpose: 'PASSWORD_RESET', hash: link.hash, expiresAt: new Date(Date.now() + PASSWORD_RESET_VALID_MINUTES * 60_000) },
+			tx
+		);
+	});
+	await sendMail(
+		passwordResetMail({ to: user.email, name: user.name, applicationName, link: link.url, validMinutes: PASSWORD_RESET_VALID_MINUTES })
+	);
 }
 
 export async function deleteAppUser(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
@@ -261,16 +316,5 @@ export async function requestPasswordReset(applicationId: string, email: string)
 	const user = await userRepo.findAppUserByEmail(app.id, normalizeEmail(email));
 	if (!user || appUserStatus(user) !== 'ACTIVE') return;
 	if (await userRepo.sentTokenSince(user.id, 'PASSWORD_RESET', new Date(Date.now() - RESET_THROTTLE_MS))) return;
-
-	const link = newLink();
-	await prisma.$transaction(async (tx) => {
-		await userRepo.revokeTokens(user.id, 'PASSWORD_RESET', tx);
-		await userRepo.createToken(
-			{ appUserId: user.id, purpose: 'PASSWORD_RESET', hash: link.hash, expiresAt: new Date(Date.now() + PASSWORD_RESET_VALID_MINUTES * 60_000) },
-			tx
-		);
-	});
-	sendMail(
-		passwordResetMail({ to: user.email, name: user.name, applicationName: app.name, link: link.url, validMinutes: PASSWORD_RESET_VALID_MINUTES })
-	).catch(() => {}); // already logged by the mailer; the user can ask again
+	sendPasswordResetLink(user, app.name).catch(() => {}); // already logged by the mailer; the user can ask again
 }

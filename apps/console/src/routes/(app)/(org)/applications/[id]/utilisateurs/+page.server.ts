@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { checkbox, parseForm, requiredString } from '$lib/validation';
-import { appUserInviteSchema, appUserRoleSchema } from '$lib/schemas/appUser';
+import { appUserInviteSchema, appUserUpdateSchema } from '$lib/schemas/appUser';
 import { can } from '$lib/records/organization';
 import { DEFAULT_PER_PAGE } from '$lib/constants';
 import { actionFailure, loadFailure } from '$lib/server/http';
@@ -59,12 +59,33 @@ export const actions: Actions = {
 		}
 	},
 
-	role: async ({ request, locals, params }) => {
-		const parsed = parseForm(await request.formData(), appUserRoleSchema);
+	update: async ({ request, locals, params }) => {
+		const parsed = parseForm(await request.formData(), appUserUpdateSchema);
 		if (!parsed.success) return fail(400, { errors: parsed.errors });
 		try {
-			const { id, role } = parsed.data;
-			return { updated: await appUserService.changeAppUserRole(locals.orgContext!, params.id, id, role) };
+			const { id, ...input } = parsed.data;
+			const { email, invitationRevoked } = await appUserService.updateAppUser(locals.orgContext!, params.id, id, input);
+			return { updated: email, invitationRevoked };
+		} catch (err) {
+			return actionFailure(err);
+		}
+	},
+
+	revoke: async ({ request, locals, params }) => {
+		const parsed = parseForm(await request.formData(), idSchema);
+		if (!parsed.success) return fail(400, { message: 'Utilisateur introuvable.' });
+		try {
+			return { revoked: await appUserService.revokeAppUserSessions(locals.orgContext!, params.id, parsed.data.id) };
+		} catch (err) {
+			return actionFailure(err);
+		}
+	},
+
+	reset: async ({ request, locals, params }) => {
+		const parsed = parseForm(await request.formData(), idSchema);
+		if (!parsed.success) return fail(400, { message: 'Utilisateur introuvable.' });
+		try {
+			return { reset: await appUserService.sendAppUserPasswordReset(locals.orgContext!, params.id, parsed.data.id) };
 		} catch (err) {
 			return actionFailure(err);
 		}

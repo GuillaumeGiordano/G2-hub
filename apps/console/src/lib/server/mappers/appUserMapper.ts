@@ -10,6 +10,7 @@ type AppUserRow = {
 	disabledAt: Date | null;
 	lastLoginAt: Date | null;
 	createdAt: Date;
+	accessTokens: { id: string }[];
 	tokens: { expiresAt: Date }[];
 };
 
@@ -34,6 +35,7 @@ export function toAppUserListItem(
 		status,
 		invitationExpired: status === 'INVITED' && (!link || link.expiresAt <= now),
 		lastLoginAt: row.lastLoginAt,
+		signedIn: row.accessTokens.length > 0,
 		createdAt: row.createdAt,
 		personalBytes: Number(personal?.bytes ?? 0n),
 		personalFiles: personal?.files ?? 0

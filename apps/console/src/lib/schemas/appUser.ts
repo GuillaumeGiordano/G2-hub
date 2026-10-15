@@ -22,8 +22,13 @@ export const appUserInviteSchema = z.object({
 	role: role.default(DEFAULT_APP_USER_ROLE)
 });
 
-/** Change the role of an application user (console). */
-export const appUserRoleSchema = z.object({ id: requiredString(), role });
+/** Edit an application user's account (console): name, e-mail and role. */
+export const appUserUpdateSchema = z.object({
+	id: requiredString(),
+	name: requiredString('Nom requis').max(120, '120 caractères maximum'),
+	email: accountEmail(),
+	role
+});
 
 /** The « choose a password » page (invitation or reset link). */
 export const passwordChooseSchema = z

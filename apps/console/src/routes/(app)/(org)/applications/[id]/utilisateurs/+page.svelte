@@ -17,7 +17,7 @@
 		Select,
 		Table
 	} from '@guillaumeg/ui';
-	import { EllipsisVertical, Send, Trash2, UserCheck, UserCog, UserPlus, Users, UserX } from '@lucide/svelte';
+	import { EllipsisVertical, KeyRound, LogOut, Pencil, Send, Trash2, UserCheck, UserPlus, Users, UserX } from '@lucide/svelte';
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { PER_PAGE_OPTIONS } from '$lib/constants';
@@ -32,8 +32,9 @@
 	} from '$lib/records/appUsers';
 	import { applicationTabs } from '$lib/records/navigation';
 	import { formatBytes } from '$lib/records/organization';
-	import { appUserInviteSchema, appUserRoleSchema } from '$lib/schemas/appUser';
+	import { appUserInviteSchema, appUserUpdateSchema } from '$lib/schemas/appUser';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
+	import { timeAgo } from '$lib/utils/timeAgo';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
 	import type { AppUserListItem } from '$lib/viewmodels/appUser';
 	import type { PageData } from './$types';
@@ -51,7 +52,7 @@
 	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 
 	const INVITE_MODAL_ID = 'app-user-invite';
-	const ROLE_MODAL_ID = 'app-user-role';
+	const EDIT_MODAL_ID = 'app-user-edit';
 	const DELETE_MODAL_ID = 'app-user-delete';
 
 	let busy = $state(false);
@@ -60,12 +61,14 @@
 	const inviteErrors = new FieldErrors(['name', 'email', 'role'], appUserInviteSchema);
 	let inviteRole = $state<string>(DEFAULT_APP_USER_ROLE);
 	let target = $state<AppUserListItem | null>(null);
-	let newRole = $state<string>(DEFAULT_APP_USER_ROLE);
-	const roleErrors = new FieldErrors(['role'], appUserRoleSchema);
+	let editRole = $state<string>(DEFAULT_APP_USER_ROLE);
+	const editErrors = new FieldErrors(['name', 'email', 'role'], appUserUpdateSchema);
 
-	// « Renvoyer l'invitation » and « Désactiver / Réactiver » submit one hidden form each.
+	// The one-click actions (resend, disable, revoke, reset) submit one hidden form each.
 	let resendForm: HTMLFormElement | undefined = $state();
 	let disableForm: HTMLFormElement | undefined = $state();
+	let revokeForm: HTMLFormElement | undefined = $state();
+	let resetForm: HTMLFormElement | undefined = $state();
 	let disableValue = $state(false);
 
 	function modal(id: string) {
@@ -91,11 +94,11 @@
 		modal(INVITE_MODAL_ID)?.showModal();
 	}
 
-	function openRole(user: AppUserListItem) {
+	function openEdit(user: AppUserListItem) {
 		target = user;
-		newRole = user.role;
-		roleErrors.clear();
-		modal(ROLE_MODAL_ID)?.showModal();
+		editRole = user.role;
+		editErrors.clear();
+		modal(EDIT_MODAL_ID)?.showModal();
 	}
 
 	function openDelete(user: AppUserListItem) {
@@ -103,10 +106,11 @@
 		modal(DELETE_MODAL_ID)?.showModal();
 	}
 
-	async function resend(user: AppUserListItem) {
+	/** Submit one of the hidden forms for `user`. */
+	async function submitFor(user: AppUserListItem, form: HTMLFormElement | undefined) {
 		target = user;
 		await tick();
-		resendForm?.requestSubmit();
+		form?.requestSubmit();
 	}
 
 	async function setDisabled(user: AppUserListItem, disabled: boolean) {
@@ -133,8 +137,16 @@
 	</div>
 {/snippet}
 
-{#snippet lastLoginCell(user: AppUserListItem)}
-	<span class="muted">{user.lastLoginAt ? dateFormat.format(user.lastLoginAt) : 'Jamais'}</span>
+{#snippet activityCell(user: AppUserListItem)}
+	<div class="activity">
+		<span class="dot" class:online={user.signedIn} aria-hidden="true"></span>
+		<div>
+			<div>{user.signedIn ? 'Connecté au portail' : user.lastLoginAt ? 'Hors ligne' : 'Jamais connecté'}</div>
+			{#if user.lastLoginAt}
+				<div class="email" title={dateFormat.format(user.lastLoginAt)}>dernière connexion {timeAgo(user.lastLoginAt)}</div>
+			{/if}
+		</div>
+	</div>
 {/snippet}
 
 {#snippet spaceCell(user: AppUserListItem)}
@@ -152,10 +164,10 @@
 			<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
 				{#snippet items(close)}
 					<ButtonActionItem
-						label="Changer le rôle"
-						icon={UserCog}
+						label="Modifier le compte"
+						icon={Pencil}
 						onclick={() => {
-							openRole(user);
+							openEdit(user);
 							close();
 						}}
 					/>
@@ -164,7 +176,25 @@
 							label="Renvoyer l'invitation"
 							icon={Send}
 							onclick={() => {
-								resend(user);
+								submitFor(user, resendForm);
+								close();
+							}}
+						/>
+					{/if}
+					{#if user.status === 'ACTIVE'}
+						<ButtonActionItem
+							label="Réinitialiser le mot de passe"
+							icon={KeyRound}
+							onclick={() => {
+								submitFor(user, resetForm);
+								close();
+							}}
+						/>
+						<ButtonActionItem
+							label="Révoquer les sessions"
+							icon={LogOut}
+							onclick={() => {
+								submitFor(user, revokeForm);
 								close();
 							}}
 						/>
@@ -236,7 +266,7 @@
 				{ key: 'name', label: 'Utilisateur', cell: nameCell },
 				{ key: 'role', label: 'Rôle', cell: roleCell },
 				{ key: 'status', label: 'État', cell: statusCell },
-				{ key: 'lastLoginAt', label: 'Dernière connexion', cell: lastLoginCell },
+				{ key: 'lastLoginAt', label: 'Activité', cell: activityCell },
 				{ key: 'personalBytes', label: 'Espace personnel', align: 'right', cell: spaceCell },
 				{ key: 'id', label: '', align: 'right', cell: actionsCell }
 			]}
@@ -262,6 +292,26 @@
 	action="?/resend"
 	hidden
 	use:enhance={toastEnhance({ success: (d) => `Invitation renvoyée à ${d.resent}.`, setBusy })}
+>
+	<input type="hidden" name="id" value={target?.id} />
+</form>
+
+<form
+	bind:this={revokeForm}
+	method="POST"
+	action="?/revoke"
+	hidden
+	use:enhance={toastEnhance({ success: (d) => `Sessions de ${d.revoked} révoquées.`, setBusy })}
+>
+	<input type="hidden" name="id" value={target?.id} />
+</form>
+
+<form
+	bind:this={resetForm}
+	method="POST"
+	action="?/reset"
+	hidden
+	use:enhance={toastEnhance({ success: (d) => `Lien de réinitialisation envoyé à ${d.reset}.`, setBusy })}
 >
 	<input type="hidden" name="id" value={target?.id} />
 </form>
@@ -316,22 +366,35 @@
 	</form>
 </Modal>
 
-<Modal id={ROLE_MODAL_ID} title="Changer le rôle">
+<Modal id={EDIT_MODAL_ID} title="Modifier le compte">
 	<form
 		method="POST"
-		action="?/role"
+		action="?/update"
 		class="form"
+		novalidate
+		oninput={editErrors.oninput}
+		onfocusout={editErrors.onfocusout}
 		use:enhance={toastEnhance({
-			success: 'Rôle mis à jour.',
-			onSuccess: () => modal(ROLE_MODAL_ID)?.close(),
+			success: (d) =>
+				d.invitationRevoked
+					? "Compte mis à jour. L'invitation partait à l'ancienne adresse : renvoyez-la."
+					: 'Compte mis à jour.',
+			onSuccess: () => modal(EDIT_MODAL_ID)?.close(),
 			setBusy,
-			fields: roleErrors
+			fields: editErrors
 		})}
 	>
-		<p class="confirm-text">{target?.name} — {target?.email}</p>
-		<input type="hidden" name="id" value={target?.id} />
-		<Select bind:value={newRole} error={roleErrors.get('role')} label="Rôle" name="role" options={appUserRoleOptions} />
-		<p class="hint">S'il est connecté au portail, il devra se reconnecter pour recevoir son nouveau rôle.</p>
+		{#if target}
+			{#key target.id}
+				<input type="hidden" name="id" value={target.id} />
+				<Input error={editErrors.get('name')} label="Nom" name="name" value={target.name} required />
+				<Input error={editErrors.get('email')} label="E-mail" name="email" type="email" value={target.email} required />
+				<Select bind:value={editRole} error={editErrors.get('role')} label="Rôle" name="role" options={appUserRoleOptions} />
+			{/key}
+		{/if}
+		<p class="hint">
+			Changer l'e-mail ou le rôle déconnecte la personne du portail : elle se reconnecte pour en profiter.
+		</p>
 		<div class="form-submit">
 			<Button type="submit" loading={busy}>Enregistrer</Button>
 		</div>
@@ -373,6 +436,22 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.activity {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+	}
+	.dot {
+		flex: none;
+		width: 8px;
+		height: 8px;
+		margin-top: 6px;
+		border-radius: 50%;
+		background: var(--text-subtle);
+	}
+	.dot.online {
+		background: var(--success);
 	}
 	.hint {
 		font-size: 13px;

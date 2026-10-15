@@ -43,6 +43,8 @@ export function searchAppUsers(params: {
 			lastLoginAt: true,
 			createdAt: true,
 			// The latest unused invitation link (to flag an expired one).
+			// An access token still valid = signed in to the portal within the last hour.
+			accessTokens: { where: { expiresAt: { gt: new Date() } }, take: 1, select: { id: true } },
 			tokens: {
 				where: { purpose: 'INVITATION', usedAt: null },
 				orderBy: { createdAt: 'desc' },
@@ -102,13 +104,20 @@ export async function setDisabled(organizationId: string, applicationId: string,
 	return count;
 }
 
-/** Returns the number of rows changed (0 = not in this organization / application). */
-export async function setRole(organizationId: string, applicationId: string, id: string, role: AppUserRole) {
-	const { count } = await prisma.appUser.updateMany({ where: { id, organizationId, applicationId }, data: { role } });
+/** Returns the number of rows changed (0 = not in this organization / application). A taken e-mail
+ *  throws P2002 (unique application + e-mail). */
+export async function updateAppUser(
+	organizationId: string,
+	applicationId: string,
+	id: string,
+	data: { name: string; email: string; role: AppUserRole }
+) {
+	const { count } = await prisma.appUser.updateMany({ where: { id, organizationId, applicationId }, data });
 	return count;
 }
 
-/** A disabled user's (or a user whose role changed) sign-in codes and access tokens stop working at once. */
+/** A user's sign-in codes and access tokens stop working at once (disabled, account edited, or
+ *  « Révoquer les sessions »). */
 export async function revokeGrants(appUserId: string) {
 	await prisma.$transaction([
 		prisma.oidcAuthCode.deleteMany({ where: { appUserId } }),
