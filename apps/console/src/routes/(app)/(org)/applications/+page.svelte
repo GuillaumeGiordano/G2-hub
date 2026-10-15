@@ -138,7 +138,9 @@
 		<EmptyState
 			icon={AppWindow}
 			title="Aucune application"
-			description="Une application représente un site ou un portail qui utilisera le hub."
+			description={data.canManage
+				? 'Une application représente un site ou un portail qui utilisera le hub.'
+				: 'Vos applications (sites, portails) apparaîtront ici dès que votre prestataire les aura créées.'}
 			cta={data.canManage ? { label: 'Créer une application', onclick: openCreate } : undefined}
 		/>
 	{:else}

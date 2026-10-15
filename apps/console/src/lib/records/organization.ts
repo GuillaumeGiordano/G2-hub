@@ -25,9 +25,10 @@ export type OrgPermission =
 	| 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	// No `members.manage`: console accounts are added and managed by the superadmin only (§32). An
-	// Admin manages the users of its applications (`appUsers.manage`) and sees its members.
-	OWNER: ['organization.manage', 'members.read', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
+	// No `members.manage` nor `applications.manage`: console accounts, applications, their API keys
+	// and their « Se connecter avec G2 Hub » settings are the superadmin's (§32) — G2 Webdev builds
+	// the client's sites. An Admin manages its applications' files and users, and its profile.
+	OWNER: ['organization.manage', 'members.read', 'appUsers.manage', 'files.write', 'read']
 };
 
 /** `role` null = the superadmin working in an organization it is not a member of. */
