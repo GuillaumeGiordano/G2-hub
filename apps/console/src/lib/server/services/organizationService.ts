@@ -7,12 +7,14 @@ import * as userRepo from '$lib/server/repositories/userRepository';
 import { purgeObjects } from '$lib/server/storage/purge';
 import { toActiveOrganization, toOrganizationListItem } from '$lib/server/mappers/organizationMapper';
 import { ensureAccount, sendInvitation } from './accountService';
+import { assertCan, type OrgContext } from '$lib/server/context';
 import { forbidden, notFound } from '$lib/server/errors';
 import { slugify } from '$lib/utils/slug';
 import type { OrgRole } from '$lib/records/organization';
 import type {
 	ActiveOrganization,
 	CreatedOrganization,
+	MyOrganization,
 	OrganizationListItem
 } from '$lib/viewmodels/organization';
 
@@ -105,6 +107,34 @@ export async function deleteOrganization(actor: Actor, id: string): Promise<stri
 	await purgeObjects(await fileRepo.listFilesForPurge(id));
 	const org = await orgRepo.deleteOrganization(id);
 	return org.name;
+}
+
+/** The organizations a member may switch to (« Choisir une organisation »). */
+export function myOrganizations(actor: Actor) {
+	return orgRepo.listOrganizationsOfUser(actor.id);
+}
+
+/** « Mon organisation »: the active organization's summary (every member). */
+export async function getMyOrganization(ctx: OrgContext): Promise<MyOrganization> {
+	assertCan(ctx, 'read');
+	const org = ctx.organization;
+	const [counts, used, memberships] = await Promise.all([
+		orgRepo.countsOf(org.id),
+		fileRepo.usedBytesByOrganization([org.id]),
+		membershipRepo.findMembershipsOfUser(ctx.userId)
+	]);
+	return {
+		id: org.id,
+		name: org.name,
+		slug: org.slug,
+		storageEnabled: org.storageEnabled,
+		quotaBytes: org.quotaBytes,
+		usedBytes: Number(used.get(org.id) ?? 0n),
+		applicationCount: counts.applications,
+		memberCount: counts.members,
+		role: org.role,
+		canSwitch: memberships.length > 1
+	};
 }
 
 // ─── Active organization (stored on the session) ────────────────────────────

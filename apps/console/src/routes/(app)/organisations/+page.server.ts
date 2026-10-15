@@ -16,6 +16,8 @@ function actorOf(locals: App.Locals) {
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
+	// The list of organizations is the superadmin's (§31): a member goes to their own.
+	if (!isSuperadmin(locals.user!.role)) redirect(303, locals.organization ? '/mon-organisation' : '/choisir-organisation');
 	const search = url.searchParams.get('q')?.trim() || undefined;
 	const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
 	const perPage = Number(url.searchParams.get('perPage')) || DEFAULT_PER_PAGE;

@@ -35,3 +35,19 @@ export type CreatedOrganization = {
 	/** A new owner account: an invitation e-mail was sent (false = it already had an account). */
 	invited: boolean;
 };
+
+/** « Mon organisation »: what every member sees about the active organization. */
+export type MyOrganization = {
+	id: string;
+	name: string;
+	slug: string;
+	storageEnabled: boolean;
+	quotaBytes: number;
+	usedBytes: number;
+	applicationCount: number;
+	memberCount: number;
+	/** The current user's role (null for the superadmin when not a member). */
+	role: OrgRole | null;
+	/** Member of several organizations: may switch to another one. */
+	canSwitch: boolean;
+};

@@ -46,7 +46,9 @@
 			description={data.isSuperadmin
 				? 'Créez une organisation ou choisissez celle dans laquelle travailler.'
 				: "Vous n'êtes membre d'aucune organisation pour le moment."}
-			cta={data.isSuperadmin ? { label: 'Voir les organisations', href: '/organisations' } : undefined}
+			cta={data.isSuperadmin
+				? { label: 'Voir les organisations', href: '/organisations' }
+				: { label: 'Choisir une organisation', href: '/choisir-organisation' }}
 		/>
 	{/if}
 </div>

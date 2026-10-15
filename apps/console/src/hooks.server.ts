@@ -20,6 +20,8 @@ const ORGANIZATION_GROUP = '/(app)/(org)';
 // Where 2FA is set up — reachable before 2FA is enabled, or the setup would be unreachable.
 const SECURITY_PATH = '/securite';
 const ORGANIZATIONS_PATH = '/organisations';
+/** Where a member of several organizations picks one (the list itself is the superadmin's, §31). */
+const CHOOSE_ORGANIZATION_PATH = '/choisir-organisation';
 
 /** The public API authenticates by API key (lib/server/api), never by session cookie. */
 const PUBLIC_API = '/api/v1/';
@@ -86,7 +88,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			redirect(302, `${SECURITY_PATH}?setup=required`);
 		}
 		if (routeId.startsWith(ORGANIZATION_GROUP) && !event.locals.organization) {
-			redirect(302, ORGANIZATIONS_PATH);
+			redirect(302, isSuperadmin(user.role) ? ORGANIZATIONS_PATH : CHOOSE_ORGANIZATION_PATH);
 		}
 	}
 

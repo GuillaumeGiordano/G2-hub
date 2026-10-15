@@ -43,6 +43,24 @@ export function searchOrganizations(params: {
 	});
 }
 
+/** The organizations a user belongs to (names only: what the « choose » page lists). */
+export function listOrganizationsOfUser(userId: string) {
+	return prisma.organization.findMany({
+		where: { memberships: { some: { userId } } },
+		orderBy: { name: 'asc' },
+		select: { id: true, name: true }
+	});
+}
+
+/** How many applications and members an organization has. */
+export async function countsOf(id: string) {
+	const row = await prisma.organization.findUnique({
+		where: { id },
+		select: { _count: { select: { applications: true, memberships: true } } }
+	});
+	return { applications: row?._count.applications ?? 0, members: row?._count.memberships ?? 0 };
+}
+
 export function countOrganizations(search: string | undefined, visibleTo: string | null) {
 	return prisma.organization.count({ where: visibleWhere(search, visibleTo) });
 }

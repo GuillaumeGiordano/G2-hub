@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = ({ locals }) => {
 	const superadmin = isSuperadmin(user.role);
 	const organization = locals.organization;
 	const nav: NavContext = {
+		isSuperadmin: superadmin,
 		hasOrganization: !!organization,
 		canManageMembers: !!organization && can(organization.role, superadmin, 'members.manage'),
 		storageEnabled: !!organization?.storageEnabled
