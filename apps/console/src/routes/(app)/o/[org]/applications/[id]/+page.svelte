@@ -10,6 +10,7 @@
 		Button,
 		ButtonAction,
 		ButtonActionItem,
+		CopyButton,
 		EmptyState,
 		Input,
 		Modal,
@@ -21,6 +22,7 @@
 	import {
 		EllipsisVertical,
 		ExternalLink,
+		Lock,
 		FileText,
 		Folder,
 		FolderOpen,
@@ -37,7 +39,16 @@
 	import Uploader from '$lib/components/files/Uploader.svelte';
 	import { fileKindLabel, fileStatusLabel, fileStatusVariant } from '$lib/records/files';
 	import { formatBytes, usageLevel, usageLevelColor, usagePercent } from '$lib/records/organization';
-	import { visibilityHint, visibilityLabel, visibilityOptions, visibilityVariant } from '$lib/records/storage';
+	import {
+		folderLockHint,
+		folderLockLabel,
+		folderLockOptions,
+		folderLockVariant,
+		visibilityHint,
+		visibilityLabel,
+		visibilityOptions,
+		visibilityVariant
+	} from '$lib/records/storage';
 	import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
@@ -92,6 +103,8 @@
 	const DELETE_FILE_MODAL_ID = 'file-delete';
 	let fileToDelete = $state<FileListItem | null>(null);
 	const RENAME_MODAL_ID = 'folder-rename';
+	const LOCK_MODAL_ID = 'folder-lock';
+	let lockValue = $state('NONE');
 	const DELETE_MODAL_ID = 'folder-delete';
 
 	let busy = $state(false);
@@ -121,6 +134,15 @@
 		modal(RENAME_MODAL_ID)?.showModal();
 	}
 
+	function openLock(folder: FolderListItem) {
+		target = folder;
+		lockValue = folder.lock;
+		modal(LOCK_MODAL_ID)?.showModal();
+	}
+
+	/** An Admin may rename / delete a folder the site does not rely on (§37); the superadmin, any. */
+	const editableFolder = (folder: FolderListItem) => b.canManageLocks || folder.lock === 'NONE';
+
 	function openDelete(folder: FolderListItem) {
 		target = folder;
 		modal(DELETE_MODAL_ID)?.showModal();
@@ -143,6 +165,11 @@
 		<Folder size={18} />
 		<span class="strong">{folder.name}</span>
 	</a>
+	{#if folder.lock !== 'NONE'}
+		<span class="lock" title={folderLockHint[folder.lock]}>
+			<Badge label={folderLockLabel[folder.lock]} variant={folderLockVariant[folder.lock]} />
+		</span>
+	{/if}
 {/snippet}
 
 {#snippet visibilityCell(folder: FolderListItem)}
@@ -157,27 +184,41 @@
 
 {#snippet actionsCell(folder: FolderListItem)}
 	<div class="actions">
-		<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
-			{#snippet items(close)}
-				<ButtonActionItem
-					label="Renommer"
-					icon={Pencil}
-					onclick={() => {
-						openRename(folder);
-						close();
-					}}
-				/>
-				<ButtonActionItem
-					label="Supprimer"
-					icon={Trash2}
-					variant="danger"
-					onclick={() => {
-						openDelete(folder);
-						close();
-					}}
-				/>
-			{/snippet}
-		</ButtonAction>
+		{#if b.canManageLocks || editableFolder(folder)}
+			<ButtonAction label="Actions" icon={EllipsisVertical} variant="ghost" size="sm">
+				{#snippet items(close)}
+					{#if b.canManageLocks}
+						<ButtonActionItem
+							label="Verrouillage"
+							icon={Lock}
+							onclick={() => {
+								openLock(folder);
+								close();
+							}}
+						/>
+					{/if}
+					{#if editableFolder(folder)}
+						<ButtonActionItem
+							label="Renommer"
+							icon={Pencil}
+							onclick={() => {
+								openRename(folder);
+								close();
+							}}
+						/>
+						<ButtonActionItem
+							label="Supprimer"
+							icon={Trash2}
+							variant="danger"
+							onclick={() => {
+								openDelete(folder);
+								close();
+							}}
+						/>
+					{/if}
+				{/snippet}
+			</ButtonAction>
+		{/if}
 	</div>
 {/snippet}
 
@@ -241,7 +282,7 @@
 						}}
 					/>
 				{/if}
-				{#if b.canWrite && file.source !== 'API' && !file.pins.length}
+				{#if b.canEditContent && file.source !== 'API' && !file.pins.length}
 					<ButtonActionItem
 						label="Supprimer"
 						icon={Trash2}
@@ -267,12 +308,31 @@
 	>
 		{#if b.folder}
 			<Badge label={visibilityLabel[b.folder.visibility]} variant={visibilityVariant[b.folder.visibility]} />
+			{#if b.folder.lock !== 'NONE'}
+				<Badge label={folderLockLabel[b.folder.lock]} variant={folderLockVariant[b.folder.lock]} />
+			{/if}
 		{/if}
-		{#if b.canWrite && b.storageEnabled}
+		{#if b.canEditContent && b.storageEnabled}
 			<Button icon={FolderPlus} onclick={openCreate}>Nouveau dossier</Button>
 		{/if}
 	</SuperTitle>
 	<PageTabs {tabs} />
+
+	{#if b.folder && b.canManageLocks}
+		<!-- The id to put in the site's code: it never changes, a path breaks when the folder is renamed (§37). -->
+		<p class="folder-id">
+			Identifiant du dossier, pour le code du site : <code>{b.folder.id}</code>
+			<CopyButton text={b.folder.id} />
+		</p>
+	{/if}
+
+	{#if b.folder && b.folder.lock !== 'NONE' && !b.canManageLocks}
+		<Alert variant="info" title={b.folder.lock === 'READ_ONLY' ? 'Dossier en lecture seule' : 'Dossier utilisé par votre site'}>
+			{b.folder.lock === 'READ_ONLY'
+				? 'Son contenu est fourni par votre prestataire : vous pouvez le consulter, pas le modifier.'
+				: 'Votre site affiche ce dossier : il ne peut être ni renommé ni supprimé. Vous pouvez gérer ses fichiers librement.'}
+		</Alert>
+	{/if}
 
 	{#if b.storageEnabled}
 		<Progress
@@ -283,7 +343,7 @@
 		/>
 	{/if}
 
-	{#if b.folder && b.canWrite && b.storageEnabled}
+	{#if b.folder && b.canEditContent && b.storageEnabled}
 		<Uploader applicationId={b.application.id} folderId={b.folder.id} />
 	{/if}
 
@@ -299,7 +359,7 @@
 			description={b.folder
 				? 'Ce dossier ne contient encore rien.'
 				: 'Créez un dossier public pour les médias du site, ou privé pour des fichiers personnels.'}
-			cta={b.canWrite ? { label: 'Créer un dossier', onclick: openCreate } : undefined}
+			cta={b.canEditContent ? { label: 'Créer un dossier', onclick: openCreate } : undefined}
 		/>
 	{:else if b.folders.length}
 		<Table
@@ -334,42 +394,70 @@
 	{prevHref}
 	{nextHref}
 	closeHref={withMedia(null)}
-	canWrite={b.canWrite}
+	canWrite={b.canEditContent}
 />
 
-<Modal id={CREATE_MODAL_ID} title="Nouveau dossier">
-	<form
-		method="POST"
-		action="?/createFolder"
-		class="form"
-		novalidate
-		oninput={createErrors.oninput}
-		onfocusout={createErrors.onfocusout}
-		use:enhance={toastEnhance({
-			success: 'Dossier créé.',
-			onSuccess: () => modal(CREATE_MODAL_ID)?.close(),
-			resetOnSuccess: true,
-			setBusy,
-			fields: createErrors
-		})}
-	>
-		{#if b.folder}<input type="hidden" name="parentId" value={b.folder.id} />{/if}
-		<Input error={createErrors.get('name')} label="Nom" name="name" required />
-		{#if b.folder}
-			<p class="hint">
-				Visibilité héritée du dossier parent :
-				<Badge label={visibilityLabel[b.folder.visibility]} variant={visibilityVariant[b.folder.visibility]} />
+{#if b.canManageLocks}
+	<Modal id={LOCK_MODAL_ID} title="Verrouillage du dossier">
+		<form
+			method="POST"
+			action="?/lockFolder"
+			class="form"
+			use:enhance={toastEnhance({
+				success: (d) => `« ${d.locked} » : ${folderLockLabel[d.lock as keyof typeof folderLockLabel].toLowerCase()}.`,
+				onSuccess: () => modal(LOCK_MODAL_ID)?.close(),
+				setBusy
+			})}
+		>
+			<p class="confirm-text">
+				<strong>{target?.name}</strong> — ce que l'admin de l'organisation peut en faire. Vous n'êtes
+				jamais limité.
 			</p>
-		{:else}
-			<RadioGroup legend="Visibilité" bind:value={newVisibility} options={visibilityOptions} orientation="horizontal" />
-			<input type="hidden" name="visibility" value={newVisibility} />
-			<p class="hint">{visibilityHint[newVisibility as 'PUBLIC' | 'PRIVATE']}</p>
-		{/if}
-		<div class="form-submit">
-			<Button type="submit" icon={FolderPlus} loading={busy}>Créer</Button>
-		</div>
-	</form>
-</Modal>
+			<input type="hidden" name="id" value={target?.id} />
+			<RadioGroup legend="Verrouillage" bind:value={lockValue} options={folderLockOptions} />
+			<input type="hidden" name="lock" value={lockValue} />
+			<div class="form-submit">
+				<Button type="submit" icon={Lock} loading={busy}>Enregistrer</Button>
+			</div>
+		</form>
+	</Modal>
+{/if}
+
+{#if b.canEditContent}
+	<Modal id={CREATE_MODAL_ID} title="Nouveau dossier">
+		<form
+			method="POST"
+			action="?/createFolder"
+			class="form"
+			novalidate
+			oninput={createErrors.oninput}
+			onfocusout={createErrors.onfocusout}
+			use:enhance={toastEnhance({
+				success: 'Dossier créé.',
+				onSuccess: () => modal(CREATE_MODAL_ID)?.close(),
+				resetOnSuccess: true,
+				setBusy,
+				fields: createErrors
+			})}
+		>
+			{#if b.folder}<input type="hidden" name="parentId" value={b.folder.id} />{/if}
+			<Input error={createErrors.get('name')} label="Nom" name="name" required />
+			{#if b.folder}
+				<p class="hint">
+					Visibilité héritée du dossier parent :
+					<Badge label={visibilityLabel[b.folder.visibility]} variant={visibilityVariant[b.folder.visibility]} />
+				</p>
+			{:else}
+				<RadioGroup legend="Visibilité" bind:value={newVisibility} options={visibilityOptions} orientation="horizontal" />
+				<input type="hidden" name="visibility" value={newVisibility} />
+				<p class="hint">{visibilityHint[newVisibility as 'PUBLIC' | 'PRIVATE']}</p>
+			{/if}
+			<div class="form-submit">
+				<Button type="submit" icon={FolderPlus} loading={busy}>Créer</Button>
+			</div>
+		</form>
+	</Modal>
+{/if}
 
 <Modal id={RENAME_MODAL_ID} title="Renommer le dossier">
 	<form
@@ -472,6 +560,18 @@
 	.file-error {
 		font-size: 12px;
 		color: var(--danger);
+	}
+	.lock {
+		margin-left: 8px;
+	}
+	.folder-id {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin: 0;
+		font-size: 13px;
+		color: var(--text-muted);
 	}
 	.folder-link {
 		display: inline-flex;

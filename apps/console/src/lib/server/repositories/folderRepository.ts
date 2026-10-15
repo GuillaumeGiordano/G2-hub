@@ -1,4 +1,4 @@
-import type { Visibility } from '$lib/records/storage';
+import type { FolderLock, Visibility } from '$lib/records/storage';
 import { prisma } from '$lib/server/db';
 
 // Folders — Prisma queries only, always scoped by organization (DECISIONS.md §13): an id that
@@ -7,7 +7,7 @@ import { prisma } from '$lib/server/db';
 export function findFolder(organizationId: string, id: string) {
 	return prisma.folder.findFirst({
 		where: { id, organizationId },
-		select: { id: true, name: true, applicationId: true, parentId: true, visibility: true, ownerAppUserId: true }
+		select: { id: true, name: true, applicationId: true, parentId: true, visibility: true, lock: true, ownerAppUserId: true }
 	});
 }
 
@@ -27,7 +27,7 @@ export function listChildren(organizationId: string, applicationId: string, pare
 	return prisma.folder.findMany({
 		where: { organizationId, applicationId, parentId, ownerAppUserId: null },
 		orderBy: { name: 'asc' },
-		select: { id: true, name: true, visibility: true, _count: { select: { children: true } } }
+		select: { id: true, name: true, visibility: true, lock: true, _count: { select: { children: true } } }
 	});
 }
 
@@ -72,8 +72,20 @@ export function createFolder(data: {
 	parentId: string | null;
 	name: string;
 	visibility: Visibility;
+	lock: FolderLock;
 }) {
 	return prisma.folder.create({ data, select: { id: true, name: true } });
+}
+
+/** Set a folder's lock (superadmin, §37). */
+export async function setFolderLock(organizationId: string, id: string, lock: FolderLock) {
+	const { count } = await prisma.folder.updateMany({ where: { id, organizationId }, data: { lock } });
+	return count;
+}
+
+/** How many of these folders are locked (an Admin cannot delete a tree that holds one). */
+export function countLockedFolders(organizationId: string, ids: string[]) {
+	return prisma.folder.count({ where: { organizationId, id: { in: ids }, lock: { not: 'NONE' } } });
 }
 
 // ─── Personal spaces (§28) — the user was checked against the API key's application first ───

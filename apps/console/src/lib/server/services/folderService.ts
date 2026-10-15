@@ -5,7 +5,7 @@ import { purgeObjects } from '$lib/server/storage/purge';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { can } from '$lib/records/organization';
 import { forbidden, HubError, notFound } from '$lib/server/errors';
-import type { Visibility } from '$lib/records/storage';
+import type { FolderLock, Visibility } from '$lib/records/storage';
 import type { FolderBrowser, FolderCrumb } from '$lib/viewmodels/folder';
 
 // Folders of an application of the ACTIVE organization (ctx comes from the session —
@@ -31,6 +31,20 @@ export async function folderOrThrow(ctx: OrgContext, applicationId: string, fold
 	const folder = await folderRepo.findFolder(ctx.organization.id, folderId);
 	if (!folder || folder.applicationId !== applicationId || folder.ownerAppUserId) throw notFound('Dossier introuvable.');
 	return folder;
+}
+
+/** A folder the SITE relies on (§37): an Admin cannot rename nor delete it — the superadmin can. */
+export function assertFolderEditable(ctx: OrgContext, folder: { lock: FolderLock }) {
+	if (!ctx.isSuperadmin && folder.lock !== 'NONE') {
+		throw new HubError('Ce dossier est utilisé par votre site : il ne peut être ni renommé ni supprimé.', { status: 403 });
+	}
+}
+
+/** A READ_ONLY folder's content (files, subfolders) is fixed for an Admin (§37). */
+export function assertContentEditable(ctx: OrgContext, folder: { lock: FolderLock }) {
+	if (!ctx.isSuperadmin && folder.lock === 'READ_ONLY') {
+		throw new HubError('Ce dossier est en lecture seule : son contenu ne peut pas être modifié.', { status: 403 });
+	}
 }
 
 /** Ancestors of a folder, root first. The tree is shallow in practice: one query per level. */
@@ -59,15 +73,19 @@ export async function browse(
 	]);
 	return {
 		application,
-		folder: folder ? { id: folder.id, name: folder.name, visibility: folder.visibility } : null,
+		folder: folder ? { id: folder.id, name: folder.name, visibility: folder.visibility, lock: folder.lock } : null,
 		crumbs,
 		folders: children.map((c) => ({
 			id: c.id,
 			name: c.name,
 			visibility: c.visibility,
+			lock: c.lock,
 			folderCount: c._count.children
 		})),
 		canWrite: can(ctx.organization.role, ctx.isSuperadmin, 'files.write'),
+		canManageLocks: ctx.isSuperadmin,
+		// Upload, delete files, create subfolders HERE (a read-only folder is fixed for an Admin).
+		canEditContent: can(ctx.organization.role, ctx.isSuperadmin, 'files.write') && (ctx.isSuperadmin || folder?.lock !== 'READ_ONLY'),
 		storageEnabled: ctx.organization.storageEnabled
 	};
 }
@@ -93,6 +111,7 @@ export async function createFolder(
 	assertStorageEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const parent = input.parentId ? await folderOrThrow(ctx, applicationId, input.parentId) : null;
+	if (parent) assertContentEditable(ctx, parent);
 	// A subfolder inherits its parent's visibility; a root folder must choose one.
 	const visibility = parent?.visibility ?? input.visibility;
 	if (!visibility) throw new HubError('Visibilité requise.', { field: 'visibility' });
@@ -102,7 +121,9 @@ export async function createFolder(
 		applicationId,
 		parentId: parent?.id ?? null,
 		name: input.name,
-		visibility
+		visibility,
+		// A folder the superadmin creates is one the site will rely on: locked by default (§37).
+		lock: ctx.isSuperadmin ? 'LOCKED' : 'NONE'
 	});
 	return folder.name;
 }
@@ -116,6 +137,7 @@ export async function renameFolder(
 	assertCan(ctx, 'files.write');
 	assertStorageEnabled(ctx);
 	const folder = await folderOrThrow(ctx, applicationId, folderId);
+	assertFolderEditable(ctx, folder);
 	await assertNameFree(ctx, applicationId, folder.parentId, name, folder.id);
 	await folderRepo.renameFolder(ctx.organization.id, folder.id, name);
 	return name;
@@ -127,7 +149,11 @@ export async function deleteFolder(ctx: OrgContext, applicationId: string, folde
 	assertCan(ctx, 'files.write');
 	assertStorageEnabled(ctx);
 	const folder = await folderOrThrow(ctx, applicationId, folderId);
+	assertFolderEditable(ctx, folder);
 	const folderIds = await folderRepo.listSubtreeIds(ctx.organization.id, folder.id);
+	if (!ctx.isSuperadmin && (await folderRepo.countLockedFolders(ctx.organization.id, folderIds))) {
+		throw new HubError('Ce dossier contient un dossier utilisé par votre site : il ne peut pas être supprimé.', { status: 403 });
+	}
 	const siteFiles = await fileRepo.countSiteFilesInFolders(ctx.organization.id, folderIds);
 	if (siteFiles) {
 		throw new HubError(
@@ -146,4 +172,12 @@ export async function deleteFolder(ctx: OrgContext, applicationId: string, folde
 	}
 	await purgeObjects(await fileRepo.listFilesInFolders(ctx.organization.id, folderIds));
 	await folderRepo.deleteFolder(ctx.organization.id, folder.id);
+}
+
+/** Lock or unlock a folder (superadmin only, §37). */
+export async function setFolderLock(ctx: OrgContext, applicationId: string, folderId: string, lock: FolderLock): Promise<string> {
+	if (!ctx.isSuperadmin) throw forbidden();
+	const folder = await folderOrThrow(ctx, applicationId, folderId);
+	await folderRepo.setFolderLock(ctx.organization.id, folder.id, lock);
+	return folder.name;
 }

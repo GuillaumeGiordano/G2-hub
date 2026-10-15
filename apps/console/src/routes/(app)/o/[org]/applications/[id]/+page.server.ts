@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { parseForm, requiredString } from '$lib/validation';
+import { FOLDER_LOCKS } from '$lib/records/storage';
 import { folderCreateSchema, folderRenameSchema } from '$lib/schemas/folder';
 import { fileTextSchema } from '$lib/schemas/fileText';
 import { actionFailure, loadFailure } from '$lib/server/http';
@@ -14,6 +15,7 @@ import type { Actions, PageServerLoad } from './$types';
 // URL (`?dossier=&media=`): shareable, back-button friendly. Every id is re-checked against the
 // session's organization by the services.
 const idSchema = z.object({ id: requiredString() });
+const folderLockSchema = z.object({ id: requiredString(), lock: z.enum(FOLDER_LOCKS) });
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const ctx = locals.orgContext!;
@@ -49,6 +51,18 @@ export const actions: Actions = {
 		try {
 			const { id, name } = parsed.data;
 			return { saved: await folderService.renameFolder(locals.orgContext!, params.id, id, name) };
+		} catch (err) {
+			return actionFailure(err);
+		}
+	},
+
+	/** Superadmin: what an Admin may do with this folder (§37). */
+	lockFolder: async ({ request, locals, params }) => {
+		const parsed = parseForm(await request.formData(), folderLockSchema);
+		if (!parsed.success) return fail(400, { message: 'Dossier introuvable.' });
+		try {
+			const { id, lock } = parsed.data;
+			return { locked: await folderService.setFolderLock(locals.orgContext!, params.id, id, lock), lock };
 		} catch (err) {
 			return actionFailure(err);
 		}

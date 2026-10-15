@@ -1,6 +1,6 @@
 {
 	"name": "@g2/hub-client",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Client for the G2 Hub public API: read an application's folders and files.",
 	"private": true,
 	"type": "module",

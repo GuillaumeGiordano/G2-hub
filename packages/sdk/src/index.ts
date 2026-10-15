@@ -125,6 +125,15 @@ export type HubUserSpace = {
 	deleteFile(id: string): Promise<void>;
 };
 
+/**
+ * A folder: its path ("Galerie/2026"), or `{ folder: id }`. Prefer the id in a site's code: it never
+ * changes, whereas a folder renamed in the console breaks every path that named it.
+ */
+export type HubFolderTarget = string | { folder: string };
+
+const folderParams = (target?: HubFolderTarget): Record<string, string | undefined> =>
+	typeof target === 'object' ? { folder: target.folder } : { path: target };
+
 export type HubFolderListing = { folder: HubFolder | null; folders: HubFolder[] };
 export type HubFileListing = { folder: HubFolder; files: HubFile[] };
 
@@ -154,10 +163,10 @@ export type HubClientOptions = {
 };
 
 export type HubClient = {
-	/** Subfolders of `path` ("Galerie"); without `path`, the application's root folders. */
-	folders(path?: string): Promise<HubFolderListing>;
-	/** Files of the folder at `path` ("Galerie/2026"), newest first. */
-	files(path: string): Promise<HubFileListing>;
+	/** Subfolders of a folder — by path ("Galerie") or `{ folder: id }`; none = the root folders. */
+	folders(target?: HubFolderTarget): Promise<HubFolderListing>;
+	/** Files of a folder — by path ("Galerie/2026") or `{ folder: id }` (preferred) — newest first. */
+	files(target: HubFolderTarget): Promise<HubFileListing>;
 	/** One file by id (a publishable key only sees a READY file of a public folder). */
 	file(id: string): Promise<HubFile>;
 	/** The application's READY files, every folder together, newest first — what a « choose a media »
@@ -267,8 +276,8 @@ export function createHubClient(options: HubClientOptions): HubClient {
 	}
 
 	const client: HubClient = {
-		folders: (path) => get<HubFolderListing>('folders', { path }),
-		files: (path) => get<HubFileListing>('files', { path }),
+		folders: (target) => get<HubFolderListing>('folders', folderParams(target)),
+		files: (target) => get<HubFileListing>('files', folderParams(target)),
 		file: (id) => get<HubFile>(`files/${encodeURIComponent(id)}`),
 		media: (params = {}) =>
 			get<HubMediaListing>('media', {

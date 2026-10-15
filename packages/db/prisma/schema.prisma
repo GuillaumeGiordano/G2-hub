@@ -140,6 +140,17 @@ enum Visibility {
 }
 
 /// A folder of an application. Folders nest; a subfolder always has its parent's visibility.
+/// What an organization's Admin may do with a folder its SITE relies on (DECISIONS.md §37). The
+/// superadmin is never restricted, and sets it.
+enum FolderLock {
+  /// Free: the Admin renames, deletes, creates subfolders and manages the files.
+  NONE
+  /// The site reads it: no rename, no delete; the files (and subfolders) stay manageable.
+  LOCKED
+  /// Content fixed too: the Admin only looks (documents provided by G2 Webdev…).
+  READ_ONLY
+}
+
 model Folder {
   id             String       @id @default(uuid())
   /// Denormalized from the application: every query is scoped by organization (§13).
@@ -154,6 +165,8 @@ model Folder {
   files          StoredFile[]
   name           String
   visibility     Visibility
+  /// A folder the superadmin creates is LOCKED by default (§37).
+  lock           FolderLock   @default(NONE)
   /// Set = the personal space of this application user (DECISIONS.md §28): one PUBLIC and one
   /// PRIVATE root per user (partial unique index, see the migration), created on first use, kept
   /// out of the site's tree (console, /folders, /media). Its files are purged with the user.

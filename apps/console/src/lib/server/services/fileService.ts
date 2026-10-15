@@ -16,7 +16,7 @@ import { kindOf, uploadRefusal } from '$lib/records/files';
 import { formatBytes } from '$lib/records/organization';
 import type { Visibility } from '$lib/records/storage';
 import type { FileListItem, StorageUsage, UploadTicket } from '$lib/viewmodels/file';
-import { applicationOrThrow, assertStorageEnabled, folderOrThrow } from './folderService';
+import { applicationOrThrow, assertContentEditable, assertStorageEnabled, folderOrThrow } from './folderService';
 
 // Files of a folder of the ACTIVE organization (ctx from the session — DECISIONS.md §13).
 //
@@ -113,6 +113,7 @@ export async function requestUpload(
 	assertStorageEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const folder = await folderOrThrow(ctx, applicationId, input.folderId);
+	assertContentEditable(ctx, folder);
 	return reserveUpload(
 		{
 			organizationId: ctx.organization.id,
@@ -276,6 +277,7 @@ export async function unpinFile(organizationId: string, applicationId: string, f
 export async function deleteFile(ctx: OrgContext, applicationId: string, fileId: string): Promise<void> {
 	assertCan(ctx, 'files.write');
 	const file = await siteFileOrThrow(ctx, applicationId, fileId);
+	assertContentEditable(ctx, await folderOrThrow(ctx, applicationId, file.folderId));
 	if (file.source === 'API') {
 		throw new HubError('Ce fichier a été envoyé par le site : il se supprime depuis le site uniquement.', { status: 403 });
 	}
@@ -305,7 +307,8 @@ export async function updateFileText(
 	text: { alt?: string | null; caption?: string | null }
 ): Promise<void> {
 	assertCan(ctx, 'files.write');
-	await siteFileOrThrow(ctx, applicationId, fileId);
+	const file = await siteFileOrThrow(ctx, applicationId, fileId);
+	assertContentEditable(ctx, await folderOrThrow(ctx, applicationId, file.folderId));
 	await setFileText(ctx.organization.id, applicationId, fileId, text);
 }
 
