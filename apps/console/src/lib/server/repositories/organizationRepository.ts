@@ -119,6 +119,12 @@ export function countOrganizations(search: string | undefined, visibleTo: string
 	return prisma.organization.count({ where: visibleWhere(search, visibleTo) });
 }
 
+/** The organization an application belongs to (only to rebuild a former address). */
+export async function findOrganizationIdOfApplication(applicationId: string) {
+	const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { organizationId: true } });
+	return app?.organizationId ?? null;
+}
+
 export function findOrganizationById(id: string) {
 	return prisma.organization.findUnique({
 		where: { id },

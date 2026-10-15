@@ -6,6 +6,7 @@ import { isSuperadmin } from '$lib/records/roles';
 import { DEFAULT_PER_PAGE } from '$lib/constants';
 import { actionFailure } from '$lib/server/http';
 import * as organizationService from '$lib/server/services/organizationService';
+import { orgPath } from '$lib/utils/orgPath';
 import type { Actions, PageServerLoad } from './$types';
 
 const idSchema = z.object({ id: requiredString() });
@@ -17,7 +18,7 @@ function actorOf(locals: App.Locals) {
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// The list of organizations is the superadmin's (§31): a member goes to their own.
-	if (!isSuperadmin(locals.user!.role)) redirect(303, locals.organization ? '/mon-organisation' : '/choisir-organisation');
+	if (!isSuperadmin(locals.user!.role)) redirect(303, '/');
 	const search = url.searchParams.get('q')?.trim() || undefined;
 	const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
 	const perPage = Number(url.searchParams.get('perPage')) || DEFAULT_PER_PAGE;
@@ -71,6 +72,6 @@ export const actions: Actions = {
 		} catch (err) {
 			return actionFailure(err);
 		}
-		redirect(303, '/mon-organisation');
+		redirect(303, orgPath(parsed.data.id));
 	}
 };

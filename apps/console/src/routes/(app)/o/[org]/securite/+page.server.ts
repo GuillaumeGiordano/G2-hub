@@ -6,5 +6,5 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = ({ locals }) => ({
 	twoFactorEnabled: !!locals.user!.twoFactorEnabled,
 	mandatory: locals.requiresTwoFactor,
-	organizationName: locals.organization!.name
+	organization: { id: locals.organization!.id, name: locals.organization!.name }
 });

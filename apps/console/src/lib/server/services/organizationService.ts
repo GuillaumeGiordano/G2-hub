@@ -239,6 +239,36 @@ export async function resolveActiveOrganization(
 	return org ? toActiveOrganization(org, role) : null;
 }
 
+/**
+ * The organization of an address (/o/<id>/…) if the actor may open it — a member, or the
+ * superadmin — else null (the hook answers 404). It becomes the session's last opened organization
+ * (the menu of the pages outside an organization, the redirects of the former addresses).
+ */
+export async function resolveOrganizationOfAddress(
+	session: { id: string; activeOrganizationId?: string | null },
+	actor: Actor,
+	memberships: { organizationId: string; role: OrgRole }[],
+	organizationId: string
+): Promise<ActiveOrganization | null> {
+	const role = memberships.find((m) => m.organizationId === organizationId)?.role ?? null;
+	if (!role && !actor.isSuperadmin) return null;
+	const org = await orgRepo.findOrganizationById(organizationId);
+	if (!org) return null;
+	if (org.id !== (session.activeOrganizationId ?? null)) await sessionRepo.setActiveOrganization(session.id, org.id);
+	return toActiveOrganization(org, role);
+}
+
+/** The organization of an application, if the actor may open it (former /applications/<id> links). */
+export async function organizationOfApplication(
+	actor: Actor,
+	memberships: { organizationId: string }[],
+	applicationId: string
+): Promise<string | null> {
+	const organizationId = await orgRepo.findOrganizationIdOfApplication(applicationId);
+	if (!organizationId) return null;
+	return actor.isSuperadmin || memberships.some((m) => m.organizationId === organizationId) ? organizationId : null;
+}
+
 /** Switch the session to `organizationId` — only to an organization the actor may see. */
 export async function switchOrganization(sessionId: string, actor: Actor, organizationId: string): Promise<string> {
 	const org = await orgRepo.findOrganizationById(organizationId);

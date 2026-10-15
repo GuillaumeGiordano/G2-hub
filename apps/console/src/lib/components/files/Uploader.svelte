@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { orgPath } from '$lib/utils/orgPath';
 	import { invalidateAll } from '$app/navigation';
 	import { Badge, FileInput, Progress } from '@guillaumeg/ui';
 	import { ACCEPT_ATTRIBUTE, uploadRefusal } from '$lib/records/files';
@@ -40,7 +42,7 @@
 			return;
 		}
 		try {
-			const res = await fetch(`/applications/${applicationId}/fichiers`, {
+			const res = await fetch(orgPath(page.params.org!, `/applications/${applicationId}/fichiers`), {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ folderId, name: file.name, size: file.size, contentType: file.type })
@@ -49,7 +51,7 @@
 			const ticket = (await res.json()) as UploadTicket;
 			await put(ticket.uploadUrl, file, ticket.contentType, (r) => (job.progress = Math.round(r * 100)));
 			job.state = 'process';
-			const done = await fetch(`/applications/${applicationId}/fichiers/${ticket.fileId}`, { method: 'POST' });
+			const done = await fetch(orgPath(page.params.org!, `/applications/${applicationId}/fichiers/${ticket.fileId}`), { method: 'POST' });
 			if (!done.ok) throw new Error(await errorOf(done));
 			job.state = 'done';
 		} catch (err) {

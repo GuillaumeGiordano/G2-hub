@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { orgPath } from '$lib/utils/orgPath';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import {
@@ -79,7 +80,7 @@
 </script>
 
 {#snippet nameCell(app: ApplicationListItem)}
-	<a class="app-link strong" href={`/applications/${app.id}`}>{app.name}</a>
+	<a class="app-link strong" href={orgPath(page.params.org!, `/applications/${app.id}`)}>{app.name}</a>
 	<div class="slug">{app.slug}</div>
 {/snippet}
 

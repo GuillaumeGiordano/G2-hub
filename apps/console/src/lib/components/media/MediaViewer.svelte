@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { orgPath } from '$lib/utils/orgPath';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { Alert, Badge, Button, CopyButton, Input, Modal, Textarea } from '@guillaumeg/ui';
@@ -111,7 +113,7 @@
 				<dl>
 					<div>
 						<dt>Dossier</dt>
-						<dd><a href={`/applications/${applicationId}?dossier=${media.folderId}`}>{media.folderName}</a></dd>
+						<dd><a href={orgPath(page.params.org!, `/applications/${applicationId}?dossier=${media.folderId}`)}>{media.folderName}</a></dd>
 					</div>
 					<div>
 						<dt>Visibilité</dt>
@@ -179,7 +181,7 @@
 
 				<div class="actions">
 					<Button href={media.downloadUrl} variant="outline" icon={Download}>Télécharger</Button>
-					<Button href={`/applications/${applicationId}?dossier=${media.folderId}`} variant="ghost" icon={FolderOpen}>
+					<Button href={orgPath(page.params.org!, `/applications/${applicationId}?dossier=${media.folderId}`)} variant="ghost" icon={FolderOpen}>
 						Ouvrir le dossier
 					</Button>
 					{#if canWrite && media.source === 'API'}

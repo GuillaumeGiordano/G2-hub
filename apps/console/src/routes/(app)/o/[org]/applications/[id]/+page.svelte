@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { orgPath } from '$lib/utils/orgPath';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -47,12 +48,12 @@
 	let { data }: { data: PageData } = $props();
 
 	const b = $derived(data.browser);
-	const base = $derived(`/applications/${b.application.id}`);
+	const base = $derived(orgPath(page.params.org!, `/applications/${b.application.id}`));
 	const folderHref = (id: string) => `${base}?dossier=${id}`;
-	const tabs = $derived(applicationTabs(b.application.id, data.canManageKeys));
+	const tabs = $derived(applicationTabs(page.params.org!, b.application.id, data.canManageKeys));
 
 	const crumbs = $derived([
-		{ label: 'Applications', href: '/applications' },
+		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },
 		{ label: b.application.name, href: b.folder ? base : undefined },
 		...b.crumbs.map((c) => ({ label: c.name, href: folderHref(c.id) })),
 		...(b.folder ? [{ label: b.folder.name }] : [])

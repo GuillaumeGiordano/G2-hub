@@ -13,10 +13,10 @@
 <div class="page">
 	<SuperTitle
 		headingLevel="h1"
-		title={data.organizationName}
+		title={data.organization.name}
 		slogan="Mot de passe et double authentification (2FA) de votre compte."
 	/>
-	<PageTabs tabs={organizationTabs} />
+	<PageTabs tabs={organizationTabs(data.organization.id)} />
 
 	<TwoFactorPanel enabled={data.twoFactorEnabled} mandatory={data.mandatory} setupRequired={false} />
 	<PasswordPanel />

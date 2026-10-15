@@ -14,6 +14,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	const nav: NavContext = {
 		isSuperadmin: superadmin,
 		hasOrganization: !!organization,
+		organizationId: organization?.id ?? null,
 		applicationCount: apps.length,
 		singleApplicationId: apps.length === 1 ? apps[0] : null
 	};

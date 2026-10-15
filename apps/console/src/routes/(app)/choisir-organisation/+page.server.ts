@@ -4,6 +4,7 @@ import { parseForm, requiredString } from '$lib/validation';
 import { isSuperadmin } from '$lib/records/roles';
 import { actionFailure } from '$lib/server/http';
 import * as organizationService from '$lib/server/services/organizationService';
+import { orgPath } from '$lib/utils/orgPath';
 import type { Actions, PageServerLoad } from './$types';
 
 // « Choisir une organisation » — for a member of several organizations (DECISIONS.md §31). It lists
@@ -30,6 +31,6 @@ export const actions: Actions = {
 		} catch (err) {
 			return actionFailure(err);
 		}
-		redirect(303, '/mon-organisation');
+		redirect(303, orgPath(parsed.data.id));
 	}
 };

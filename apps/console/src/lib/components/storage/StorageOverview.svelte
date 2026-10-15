@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { orgPath } from '$lib/utils/orgPath';
 	import { Alert, Badge, Button, Card, Progress, Table } from '@guillaumeg/ui';
 	import { ArrowUpCircle } from '@lucide/svelte';
 	import { fileKindLabel } from '$lib/records/files';
@@ -18,7 +20,7 @@
 </script>
 
 {#snippet appNameCell(row: AppRow)}
-	<a class="strong" href={`/applications/${row.id}`}>{row.name}</a>
+	<a class="strong" href={orgPath(page.params.org!, `/applications/${row.id}`)}>{row.name}</a>
 {/snippet}
 
 {#snippet kindNameCell(row: KindRow)}

@@ -1,7 +1,11 @@
-import { redirect, type Handle, type ServerInit } from '@sveltejs/kit';
+import { error, redirect, type Handle, type ServerInit } from '@sveltejs/kit';
 import { auth } from '$lib/server/auth';
 import { isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
-import { membershipsOf, resolveActiveOrganization } from '$lib/server/services/organizationService';
+import {
+	membershipsOf,
+	resolveActiveOrganization,
+	resolveOrganizationOfAddress
+} from '$lib/server/services/organizationService';
 import { startMediaWorker } from '$lib/server/media/worker';
 
 // One media worker per process: transcodes queued videos and removes abandoned uploads.
@@ -10,18 +14,16 @@ export const init: ServerInit = () => {
 };
 
 // Central authorization. `event.route.id` carries the (group) segments — e.g.
-// "/(app)/(org)/membres" — whereas the URL does not. Guarding by that prefix here covers pages AND
+// "/(app)/o/[org]/membres" — whereas the URL does not. Guarding by that prefix here covers pages AND
 // `+server.ts` endpoints in one place (endpoints bypass layout guards), so a new route is protected
 // by default. Finer rights (owner-only actions…) are enforced by the services.
 const SIGNED_IN_GROUP = '/(app)';
-/** Pages working on the active organization: without one, pick it first. */
-const ORGANIZATION_GROUP = '/(app)/(org)';
+/** An organization's pages: /o/<organization id>/… — the id is checked against the memberships. */
+const ORGANIZATION_ROUTE = '/(app)/o/[org]';
 
 // Where 2FA is set up — reachable before 2FA is enabled, or the setup would be unreachable.
 const SECURITY_PATH = '/securite';
 const ORGANIZATIONS_PATH = '/organisations';
-/** Where a member of several organizations picks one (the list itself is the superadmin's, §31). */
-const CHOOSE_ORGANIZATION_PATH = '/choisir-organisation';
 
 /** The public API authenticates by API key (lib/server/api), never by session cookie. */
 const PUBLIC_API = '/api/v1/';
@@ -70,7 +72,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		// every request — never from a browser parameter (DECISIONS.md §13).
 		const actor = { id: session.user.id, isSuperadmin: isSuperadmin(session.user.role) };
 		const memberships = await membershipsOf(actor.id);
-		const organization = await resolveActiveOrganization(session.session, actor, memberships);
+		// On an organization's page, the organization is the one of the ADDRESS — re-checked here
+		// against the memberships, on every request; anywhere else, the last one opened (§13).
+		const organization = (event.route.id ?? '').startsWith(ORGANIZATION_ROUTE)
+			? await resolveOrganizationOfAddress(session.session, actor, memberships, event.params.org ?? '')
+			: await resolveActiveOrganization(session.session, actor, memberships);
 		event.locals.organization = organization;
 		event.locals.orgContext = organization
 			? { userId: actor.id, isSuperadmin: actor.isSuperadmin, organization }
@@ -87,8 +93,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (event.locals.requiresTwoFactor && !user.twoFactorEnabled && event.url.pathname !== SECURITY_PATH) {
 			redirect(302, `${SECURITY_PATH}?setup=required`);
 		}
-		if (routeId.startsWith(ORGANIZATION_GROUP) && !event.locals.organization) {
-			redirect(302, isSuperadmin(user.role) ? ORGANIZATIONS_PATH : CHOOSE_ORGANIZATION_PATH);
+		// Not a member (or no such organization): 404, never revealing that it exists elsewhere.
+		if (routeId.startsWith(ORGANIZATION_ROUTE) && !event.locals.organization) {
+			error(404, 'Organisation introuvable.');
 		}
 	}
 

@@ -5,6 +5,7 @@
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { organizationTabs } from '$lib/records/navigation';
+	import { orgPath } from '$lib/utils/orgPath';
 	import {
 		formatBytes,
 		legalFormOptions,
@@ -71,7 +72,7 @@
 			<Button variant="outline" icon={ArrowLeftRight} href="/choisir-organisation">Changer d'organisation</Button>
 		{/if}
 	</SuperTitle>
-	<PageTabs tabs={organizationTabs} />
+	<PageTabs tabs={organizationTabs(org.id)} />
 
 	<div class="top">
 		<Card>
@@ -144,8 +145,8 @@
 				<Progress value={percent} color={usageLevelColor[usageLevel(org.usedBytes, org.quotaBytes)]} />
 			{/if}
 			<div class="links">
-				<Button variant="outline" size="sm" icon={AppWindow} href="/applications">Applications</Button>
-				{#if org.isSuperadmin}<Button variant="outline" size="sm" icon={Users} href="/membres">Membres</Button>{/if}
+				<Button variant="outline" size="sm" icon={AppWindow} href={orgPath(org.id, '/applications')}>Applications</Button>
+				{#if org.isSuperadmin}<Button variant="outline" size="sm" icon={Users} href={orgPath(org.id, '/membres')}>Membres</Button>{/if}
 			</div>
 		</Card>
 	</div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { orgPath } from '$lib/utils/orgPath';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { Alert, Badge, Breadcrumb, Button, Card, CopyButton, Modal, TagInput } from '@guillaumeg/ui';
@@ -15,10 +17,10 @@
 	let { data }: { data: PageData } = $props();
 
 	const sso = $derived(data.sso);
-	const tabs = $derived(applicationTabs(sso.application.id, true));
+	const tabs = $derived(applicationTabs(page.params.org!, sso.application.id, true));
 	const crumbs = $derived([
-		{ label: 'Applications', href: '/applications' },
-		{ label: sso.application.name, href: `/applications/${sso.application.id}` },
+		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },
+		{ label: sso.application.name, href: orgPath(page.params.org!, `/applications/${sso.application.id}`) },
 		{ label: 'Connexion' }
 	]);
 

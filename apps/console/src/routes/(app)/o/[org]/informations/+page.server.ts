@@ -5,8 +5,9 @@ import { actionFailure, loadFailure } from '$lib/server/http';
 import * as organizationService from '$lib/server/services/organizationService';
 import type { Actions, PageServerLoad } from './$types';
 
-// « Mon organisation » — the active organization's page, for its members (DECISIONS.md §31). The
-// (org) group guarantees an active organization: `locals.orgContext` is set (hooks.server.ts).
+// « Mon organisation › Informations » (/o/<id>/informations) — the organization's profile, for its
+// members (DECISIONS.md §31). The hook guarantees `locals.orgContext` (the organization of the
+// address, access checked).
 // The profile is edited by its Admins, the contract by the superadmin (the service checks both).
 export const load: PageServerLoad = async ({ locals }) => {
 	try {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { orgPath } from '$lib/utils/orgPath';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
@@ -41,10 +42,10 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const tabs = $derived(applicationTabs(data.application.id, data.canManageKeys));
+	const tabs = $derived(applicationTabs(page.params.org!, data.application.id, data.canManageKeys));
 	const crumbs = $derived([
-		{ label: 'Applications', href: '/applications' },
-		{ label: data.application.name, href: `/applications/${data.application.id}` },
+		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },
+		{ label: data.application.name, href: orgPath(page.params.org!, `/applications/${data.application.id}`) },
 		{ label: 'Utilisateurs' }
 	]);
 	const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.perPage)));

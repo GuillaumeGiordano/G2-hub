@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { orgPath } from '$lib/utils/orgPath';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
@@ -36,10 +37,10 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const tabs = $derived(applicationTabs(data.application.id, true));
+	const tabs = $derived(applicationTabs(page.params.org!, data.application.id, true));
 	const crumbs = $derived([
-		{ label: 'Applications', href: '/applications' },
-		{ label: data.application.name, href: `/applications/${data.application.id}` },
+		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },
+		{ label: data.application.name, href: orgPath(page.params.org!, `/applications/${data.application.id}`) },
 		{ label: 'Clés API' }
 	]);
 	const apiBase = $derived(`${page.url.origin}/api/v1`);
