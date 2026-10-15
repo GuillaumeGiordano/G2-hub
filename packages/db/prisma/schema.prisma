@@ -14,6 +14,11 @@ datasource db {
 // ─── Tenancy ─────────────────────────────────────────────────────────────────
 
 /// A client of the instance (billed monthly outside the hub). Owns members and applications.
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 model Organization {
   id             String   @id @default(uuid())
   name           String
@@ -24,6 +29,48 @@ model Organization {
   storageEnabled Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  // ── Profile (« Mon organisation », DECISIONS.md §31) — every field optional for now ──
+  /// Identity: legal name, legal form (records/organization `LEGAL_FORMS`), SIRET (14 digits, the
+  /// SIREN is its first 9), intra-EU VAT number, NAF / APE code.
+  legalName           String?
+  legalForm           String?
+  siret               String?
+  vatNumber           String?
+  nafCode             String?
+  /// Logo: key of a WebP in the PUBLIC bucket (`organizations/<id>/logo-<uuid>.webp`).
+  logoKey             String?
+  email               String?
+  phone               String?
+  website             String?
+  /// Head office address.
+  addressLine1        String?
+  addressLine2        String?
+  postalCode          String?
+  city                String?
+  country             String?
+  /// Billing: same address as the head office unless unticked.
+  billingSameAddress  Boolean            @default(true)
+  billingAddressLine1 String?
+  billingAddressLine2 String?
+  billingPostalCode   String?
+  billingCity         String?
+  billingCountry      String?
+  billingEmail        String?
+  billingContactName  String?
+  purchaseOrderRef    String?
+  /// Main contact, and the GDPR / DPO contact.
+  contactName         String?
+  contactRole         String?
+  contactEmail        String?
+  contactPhone        String?
+  dpoName             String?
+  dpoEmail            String?
+  /// Contract — written by the superadmin only. SUSPENDED is informative for now (nothing blocked).
+  status              OrganizationStatus @default(ACTIVE)
+  contractStartedAt   DateTime?
+  /// Never shown to the organization's members.
+  internalNotes       String?
 
   memberships  Membership[]
   applications Application[]

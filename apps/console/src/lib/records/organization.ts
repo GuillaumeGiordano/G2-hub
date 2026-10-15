@@ -15,10 +15,16 @@ export const SUPERADMIN_LABEL = 'Superadmin';
 
 /** What a member may do in its organization (DECISIONS.md §3, §26). The superadmin may do everything.
  *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
-export type OrgPermission = 'members.manage' | 'applications.manage' | 'appUsers.manage' | 'files.write' | 'read';
+export type OrgPermission =
+	| 'organization.manage'
+	| 'members.manage'
+	| 'applications.manage'
+	| 'appUsers.manage'
+	| 'files.write'
+	| 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	OWNER: ['members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
+	OWNER: ['organization.manage', 'members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
 };
 
 /** `role` null = the superadmin working in an organization it is not a member of. */
@@ -86,3 +92,46 @@ export const usageBadgeVariant: Record<UsageLevel, 'default' | 'warning' | 'dang
 export function offerLabel(storageEnabled: boolean): string {
 	return storageEnabled ? 'Accès + Stockage' : 'Accès';
 }
+
+// ─── Profile (« Mon organisation », DECISIONS.md §31) ─────────────────────────
+
+/** Legal forms offered in the profile (French companies first, then the rest). */
+export const LEGAL_FORMS = ['EI', 'MICRO', 'EURL', 'SARL', 'SASU', 'SAS', 'SA', 'SCI', 'SCOP', 'ASSOCIATION', 'PUBLIC', 'OTHER'] as const;
+export type LegalForm = (typeof LEGAL_FORMS)[number];
+
+export const legalFormLabel: Record<LegalForm, string> = {
+	EI: 'Entreprise individuelle (EI)',
+	MICRO: 'Micro-entreprise',
+	EURL: 'EURL',
+	SARL: 'SARL',
+	SASU: 'SASU',
+	SAS: 'SAS',
+	SA: 'SA',
+	SCI: 'SCI',
+	SCOP: 'SCOP',
+	ASSOCIATION: 'Association',
+	PUBLIC: 'Établissement public / collectivité',
+	OTHER: 'Autre'
+};
+
+export const legalFormOptions = LEGAL_FORMS.map((f) => ({ value: f, label: legalFormLabel[f] }));
+
+/** SUSPENDED is informative for now: nothing is blocked (§31). */
+export const ORGANIZATION_STATUSES = ['ACTIVE', 'SUSPENDED'] as const;
+export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];
+
+export const organizationStatusLabel: Record<OrganizationStatus, string> = {
+	ACTIVE: 'Active',
+	SUSPENDED: 'Suspendue'
+};
+
+export const organizationStatusVariant: Record<OrganizationStatus, 'success' | 'warning'> = {
+	ACTIVE: 'success',
+	SUSPENDED: 'warning'
+};
+
+export const organizationStatusOptions = ORGANIZATION_STATUSES.map((s) => ({ value: s, label: organizationStatusLabel[s] }));
+
+/** The logo an Admin uploads: an image, resized by the hub to a small WebP. */
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

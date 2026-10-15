@@ -32,3 +32,13 @@ export async function processImage(input: Uint8Array): Promise<ProcessedImage[]>
 	}
 	return out;
 }
+
+/** An organization's logo: fits in 512 × 512, never upscaled, transparent background kept. */
+export async function processLogo(input: Uint8Array): Promise<Uint8Array> {
+	const data = await sharp(input, { failOn: 'error' })
+		.rotate()
+		.resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+		.webp({ quality: 85 })
+		.toBuffer();
+	return new Uint8Array(data);
+}

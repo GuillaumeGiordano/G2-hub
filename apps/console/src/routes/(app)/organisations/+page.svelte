@@ -24,6 +24,8 @@
 		DEFAULT_QUOTA_BYTES,
 		formatBytes,
 		offerLabel,
+		organizationStatusLabel,
+		organizationStatusVariant,
 		orgRoleLabel,
 		quotaOptions,
 		usageBadgeVariant,
@@ -124,6 +126,7 @@
 	<div class="name">
 		<span class="strong">{org.name}</span>
 		{#if org.id === activeOrgId}<Badge label="Active" variant="success" />{/if}
+		{#if org.status === 'SUSPENDED'}<Badge label={organizationStatusLabel.SUSPENDED} variant={organizationStatusVariant.SUSPENDED} />{/if}
 	</div>
 	<div class="slug">{org.slug}</div>
 {/snippet}

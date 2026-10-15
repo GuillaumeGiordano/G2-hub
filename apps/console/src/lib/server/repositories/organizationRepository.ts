@@ -37,6 +37,7 @@ export function searchOrganizations(params: {
 			slug: true,
 			quotaBytes: true,
 			storageEnabled: true,
+			status: true,
 			_count: { select: { memberships: true, applications: true, files: { where: { source: 'API' } } } },
 			memberships: { where: { userId: params.userId }, select: { role: true } }
 		}
@@ -59,6 +60,59 @@ export async function countsOf(id: string) {
 		select: { _count: { select: { applications: true, memberships: true } } }
 	});
 	return { applications: row?._count.applications ?? 0, members: row?._count.memberships ?? 0 };
+}
+
+const profileSelect = {
+	legalName: true,
+	legalForm: true,
+	siret: true,
+	vatNumber: true,
+	nafCode: true,
+	logoKey: true,
+	email: true,
+	phone: true,
+	website: true,
+	addressLine1: true,
+	addressLine2: true,
+	postalCode: true,
+	city: true,
+	country: true,
+	billingSameAddress: true,
+	billingAddressLine1: true,
+	billingAddressLine2: true,
+	billingPostalCode: true,
+	billingCity: true,
+	billingCountry: true,
+	billingEmail: true,
+	billingContactName: true,
+	purchaseOrderRef: true,
+	contactName: true,
+	contactRole: true,
+	contactEmail: true,
+	contactPhone: true,
+	dpoName: true,
+	dpoEmail: true,
+	status: true,
+	contractStartedAt: true,
+	internalNotes: true
+} as const;
+
+/** The profile and contract of an organization (« Mon organisation »). */
+export function findOrganizationProfile(id: string) {
+	return prisma.organization.findUnique({ where: { id }, select: profileSelect });
+}
+
+/** Fields an Admin edits (name + profile). */
+export function updateOrganizationProfile(id: string, data: Prisma.OrganizationUpdateInput) {
+	return prisma.organization.update({ where: { id }, data, select: { name: true } });
+}
+
+/** Contract fields (superadmin) and the logo key. */
+export function updateOrganizationInternal(
+	id: string,
+	data: Pick<Prisma.OrganizationUpdateInput, 'status' | 'contractStartedAt' | 'internalNotes' | 'logoKey'>
+) {
+	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
 
 export function countOrganizations(search: string | undefined, visibleTo: string | null) {

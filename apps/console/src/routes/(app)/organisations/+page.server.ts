@@ -71,6 +71,6 @@ export const actions: Actions = {
 		} catch (err) {
 			return actionFailure(err);
 		}
-		redirect(303, '/applications');
+		redirect(303, '/mon-organisation');
 	}
 };

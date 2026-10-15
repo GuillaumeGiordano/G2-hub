@@ -4,11 +4,15 @@ import * as membershipRepo from '$lib/server/repositories/membershipRepository';
 import * as sessionRepo from '$lib/server/repositories/sessionRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
 import * as userRepo from '$lib/server/repositories/userRepository';
+import * as storage from '$lib/server/storage/s3';
+import { processLogo } from '$lib/server/storage/images';
 import { purgeObjects } from '$lib/server/storage/purge';
-import { toActiveOrganization, toOrganizationListItem } from '$lib/server/mappers/organizationMapper';
+import { toActiveOrganization, toOrganizationContract, toOrganizationListItem, toOrganizationProfile } from '$lib/server/mappers/organizationMapper';
 import { ensureAccount, sendInvitation } from './accountService';
 import { assertCan, type OrgContext } from '$lib/server/context';
-import { forbidden, notFound } from '$lib/server/errors';
+import { forbidden, HubError, notFound } from '$lib/server/errors';
+import { can, LOGO_MAX_BYTES, LOGO_TYPES } from '$lib/records/organization';
+import type { OrganizationContractInput, OrganizationProfileInput } from '$lib/schemas/organizationProfile';
 import { slugify } from '$lib/utils/slug';
 import type { OrgRole } from '$lib/records/organization';
 import type {
@@ -105,6 +109,8 @@ export async function deleteOrganization(actor: Actor, id: string): Promise<stri
 	if (!actor.isSuperadmin) throw forbidden();
 	if (!(await orgRepo.findOrganizationById(id))) throw notFound('Organisation introuvable.');
 	await purgeObjects(await fileRepo.listFilesForPurge(id));
+	const logoKey = (await orgRepo.findOrganizationProfile(id))?.logoKey;
+	if (logoKey) await storage.deleteObjects('PUBLIC', [logoKey]);
 	const org = await orgRepo.deleteOrganization(id);
 	return org.name;
 }
@@ -118,11 +124,13 @@ export function myOrganizations(actor: Actor) {
 export async function getMyOrganization(ctx: OrgContext): Promise<MyOrganization> {
 	assertCan(ctx, 'read');
 	const org = ctx.organization;
-	const [counts, used, memberships] = await Promise.all([
+	const [counts, used, memberships, profile] = await Promise.all([
 		orgRepo.countsOf(org.id),
 		fileRepo.usedBytesByOrganization([org.id]),
-		membershipRepo.findMembershipsOfUser(ctx.userId)
+		membershipRepo.findMembershipsOfUser(ctx.userId),
+		orgRepo.findOrganizationProfile(org.id)
 	]);
+	if (!profile) throw notFound('Organisation introuvable.');
 	return {
 		id: org.id,
 		name: org.name,
@@ -133,8 +141,68 @@ export async function getMyOrganization(ctx: OrgContext): Promise<MyOrganization
 		applicationCount: counts.applications,
 		memberCount: counts.members,
 		role: org.role,
-		canSwitch: memberships.length > 1
+		canSwitch: memberships.length > 1,
+		canEdit: can(org.role, ctx.isSuperadmin, 'organization.manage'),
+		isSuperadmin: ctx.isSuperadmin,
+		logoUrl: profile.logoKey ? storage.publicUrl(profile.logoKey) : null,
+		profile: toOrganizationProfile(profile),
+		contract: toOrganizationContract(profile, ctx.isSuperadmin)
 	};
+}
+
+/** Empty → null: an optional field cleared in the form is cleared in the database. */
+const orNull = <T>(v: T | undefined) => (v === undefined ? null : v);
+
+/** The profile, edited by the organization's Admins (and the superadmin). */
+export async function updateOrganizationProfile(ctx: OrgContext, input: OrganizationProfileInput): Promise<string> {
+	assertCan(ctx, 'organization.manage');
+	const { name, billingSameAddress, ...rest } = input;
+	const data = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, orNull(v)]));
+	// « Same as the head office »: the billing address fields are not kept.
+	if (billingSameAddress) {
+		for (const k of ['billingAddressLine1', 'billingAddressLine2', 'billingPostalCode', 'billingCity', 'billingCountry']) data[k] = null;
+	}
+	const org = await orgRepo.updateOrganizationProfile(ctx.organization.id, { ...data, name, billingSameAddress });
+	return org.name;
+}
+
+/** The contract (status, start date, internal notes): the superadmin's. */
+export async function updateOrganizationContract(ctx: OrgContext, input: OrganizationContractInput): Promise<string> {
+	if (!ctx.isSuperadmin) throw forbidden();
+	const org = await orgRepo.updateOrganizationInternal(ctx.organization.id, {
+		status: input.status,
+		contractStartedAt: input.contractStartedAt ? new Date(`${input.contractStartedAt}T00:00:00Z`) : null,
+		internalNotes: orNull(input.internalNotes)
+	});
+	return org.name;
+}
+
+/** Upload / replace the logo: resized to a small WebP in the PUBLIC bucket (any page may show it).
+ *  It does not count toward the storage quota. */
+export async function setOrganizationLogo(ctx: OrgContext, file: File): Promise<string> {
+	assertCan(ctx, 'organization.manage');
+	if (!LOGO_TYPES.includes(file.type)) throw new HubError('Format non accepté (JPEG, PNG ou WebP).', { field: 'logo' });
+	if (file.size > LOGO_MAX_BYTES) throw new HubError('Logo trop lourd (2 Mo maximum).', { field: 'logo' });
+	let body: Uint8Array;
+	try {
+		body = await processLogo(new Uint8Array(await file.arrayBuffer()));
+	} catch {
+		throw new HubError('Image illisible.', { field: 'logo' });
+	}
+	const previous = (await orgRepo.findOrganizationProfile(ctx.organization.id))?.logoKey ?? null;
+	const key = `organizations/${ctx.organization.id}/logo-${crypto.randomUUID()}.webp`;
+	await storage.putObject('PUBLIC', key, body, 'image/webp');
+	await orgRepo.updateOrganizationInternal(ctx.organization.id, { logoKey: key });
+	if (previous) await storage.deleteObjects('PUBLIC', [previous]);
+	return storage.publicUrl(key);
+}
+
+export async function removeOrganizationLogo(ctx: OrgContext): Promise<void> {
+	assertCan(ctx, 'organization.manage');
+	const previous = (await orgRepo.findOrganizationProfile(ctx.organization.id))?.logoKey ?? null;
+	if (!previous) return;
+	await orgRepo.updateOrganizationInternal(ctx.organization.id, { logoKey: null });
+	await storage.deleteObjects('PUBLIC', [previous]);
 }
 
 // ─── Active organization (stored on the session) ────────────────────────────

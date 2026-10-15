@@ -1,0 +1,37 @@
+-- CreateEnum
+CREATE TYPE "OrganizationStatus" AS ENUM ('ACTIVE', 'SUSPENDED');
+
+-- AlterTable
+ALTER TABLE "Organization" ADD COLUMN     "addressLine1" TEXT,
+ADD COLUMN     "addressLine2" TEXT,
+ADD COLUMN     "billingAddressLine1" TEXT,
+ADD COLUMN     "billingAddressLine2" TEXT,
+ADD COLUMN     "billingCity" TEXT,
+ADD COLUMN     "billingContactName" TEXT,
+ADD COLUMN     "billingCountry" TEXT,
+ADD COLUMN     "billingEmail" TEXT,
+ADD COLUMN     "billingPostalCode" TEXT,
+ADD COLUMN     "billingSameAddress" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "city" TEXT,
+ADD COLUMN     "contactEmail" TEXT,
+ADD COLUMN     "contactName" TEXT,
+ADD COLUMN     "contactPhone" TEXT,
+ADD COLUMN     "contactRole" TEXT,
+ADD COLUMN     "contractStartedAt" TIMESTAMP(3),
+ADD COLUMN     "country" TEXT,
+ADD COLUMN     "dpoEmail" TEXT,
+ADD COLUMN     "dpoName" TEXT,
+ADD COLUMN     "email" TEXT,
+ADD COLUMN     "internalNotes" TEXT,
+ADD COLUMN     "legalForm" TEXT,
+ADD COLUMN     "legalName" TEXT,
+ADD COLUMN     "logoKey" TEXT,
+ADD COLUMN     "nafCode" TEXT,
+ADD COLUMN     "phone" TEXT,
+ADD COLUMN     "postalCode" TEXT,
+ADD COLUMN     "purchaseOrderRef" TEXT,
+ADD COLUMN     "siret" TEXT,
+ADD COLUMN     "status" "OrganizationStatus" NOT NULL DEFAULT 'ACTIVE',
+ADD COLUMN     "vatNumber" TEXT,
+ADD COLUMN     "website" TEXT;
+
