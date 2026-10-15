@@ -4,7 +4,7 @@ import { GALLERY_MAX_BYTES, GALLERY_TYPES, galleryPath, hub } from '$lib/server/
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 // « Gérer la galerie » — the site's back-office inside the portal, for the ADMINS of the client's
-// organization (role claim from G2 Hub, DECISIONS.md §30). The role is checked HERE, on the server,
+// organization (role claim from G2 Hub, DECISIONS.md §29). The role is checked HERE, on the server,
 // for the page and for every action: hiding the button is not a protection. The hub only sees the
 // application's secret key: these are the SITE's files, not a personal space.
 

@@ -6,7 +6,7 @@ import type { Visibility } from '$lib/records/storage';
 import type { MediaItem } from '$lib/viewmodels/media';
 
 // One READY file of an application of the ACTIVE organization (ctx from the session — §13), with
-// everything the Files tab's viewer needs (§30). Readable by every member.
+// everything the Files tab's viewer needs (§29). Readable by every member.
 
 type MediaRow = Awaited<ReturnType<typeof fileRepo.searchMedia>>[number];
 

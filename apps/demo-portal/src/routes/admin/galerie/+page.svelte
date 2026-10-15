@@ -7,7 +7,7 @@
 	import type { GalleryItem } from './+page.server';
 	import type { ActionData, PageData } from './$types';
 
-	// « Gérer la galerie » — what a client's back-office does with G2 Hub (DECISIONS.md §30): list a
+	// « Gérer la galerie » — what a client's back-office does with G2 Hub (DECISIONS.md §29): list a
 	// folder, add a photo, edit its texts, delete it. The landing page (port 5190) shows the gallery
 	// folder: every change here is visible there on reload.
 	let { data, form }: { data: PageData; form: ActionData } = $props();

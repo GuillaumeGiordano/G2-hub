@@ -11,7 +11,7 @@
 	// reads `endpoint`, a route of the SITE's server that lists the images through G2 Hub with the
 	// secret key (see routes/admin/media): the key never reaches the browser. The site then stores
 	// the chosen file's ID (never its URL) and pins it. With `foldersEndpoint`, a « Dossier » select
-	// narrows the list to one folder and its subfolders (DECISIONS.md §30).
+	// narrows the list to one folder and its subfolders (DECISIONS.md §29).
 	let {
 		endpoint,
 		foldersEndpoint,
