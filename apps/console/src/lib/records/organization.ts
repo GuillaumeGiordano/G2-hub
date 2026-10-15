@@ -17,6 +17,7 @@ export const SUPERADMIN_LABEL = 'Superadmin';
  *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
 export type OrgPermission =
 	| 'organization.manage'
+	| 'members.read'
 	| 'members.manage'
 	| 'applications.manage'
 	| 'appUsers.manage'
@@ -24,7 +25,9 @@ export type OrgPermission =
 	| 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	OWNER: ['organization.manage', 'members.manage', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
+	// No `members.manage`: console accounts are added and managed by the superadmin only (§32). An
+	// Admin manages the users of its applications (`appUsers.manage`) and sees its members.
+	OWNER: ['organization.manage', 'members.read', 'applications.manage', 'appUsers.manage', 'files.write', 'read']
 };
 
 /** `role` null = the superadmin working in an organization it is not a member of. */

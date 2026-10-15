@@ -2,46 +2,36 @@ import { Prisma } from '@g2-hub/db';
 import { prisma } from '$lib/server/db';
 import * as membershipRepo from '$lib/server/repositories/membershipRepository';
 import * as userRepo from '$lib/server/repositories/userRepository';
-import { canEditAccount, toMemberListItem } from '$lib/server/mappers/memberMapper';
+import { toMemberListItem } from '$lib/server/mappers/memberMapper';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { HubError, notFound } from '$lib/server/errors';
 import { ensureAccount, requestPasswordReset, sendInvitation } from './accountService';
 import type { OrgRole } from '$lib/records/organization';
 import type { AddedMember, MemberListItem } from '$lib/viewmodels/member';
 
-// Members of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13). Managed by
-// its Admins (and the superadmin); every member is an Admin (§26). An organization always keeps
-// at least one (enabled).
-//
-// A console account may belong to several organizations: editing it (e-mail, password, 2FA,
-// sessions, disabled) would reach the others too. So an Admin only edits an account that belongs
-// to their organization alone; a shared account, or the superadmin's, is the superadmin's (§30).
+// Members of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13); every member
+// is an Admin (§26). Console accounts are the operator's: only the SUPERADMIN adds, edits, signs
+// out, disables or removes them (§32). An Admin sees the list (`members.read`) and manages the
+// users of its applications instead. An organization always keeps at least one (enabled) Admin.
 
 /** How long a reset link must wait before another one is sent (same window as auth.ts). */
 const RESET_THROTTLE_MS = 2 * 60_000;
 
 export async function listMembers(ctx: OrgContext, search?: string): Promise<MemberListItem[]> {
-	assertCan(ctx, 'members.manage');
+	assertCan(ctx, 'members.read');
 	const rows = await membershipRepo.listMembers(ctx.organization.id, search);
 	const now = new Date();
 	return rows.map((r) => toMemberListItem(r, { userId: ctx.userId, isSuperadmin: ctx.isSuperadmin }, now));
 }
 
-/** A member of THIS organization whose account the viewer may edit, or 404 / 403. */
+/** A member of THIS organization, for an action of the superadmin (403 for anyone else, 404 for an
+ *  unknown id). */
 async function editableMember(ctx: OrgContext, membershipId: string) {
 	assertCan(ctx, 'members.manage');
 	const member = await membershipRepo.findMemberInOrganization(ctx.organization.id, membershipId);
 	if (!member) throw notFound('Membre introuvable.');
-	const [account, memberships] = await Promise.all([
-		userRepo.findUserAccount(member.userId),
-		membershipRepo.countMembershipsOfUser(member.userId)
-	]);
+	const account = await userRepo.findUserAccount(member.userId);
 	if (!account) throw notFound('Membre introuvable.');
-	if (!canEditAccount({ role: account.role, memberships }, { isSuperadmin: ctx.isSuperadmin })) {
-		throw new HubError('Ce compte appartient aussi à une autre organisation : seul le superadmin peut le modifier.', {
-			status: 403
-		});
-	}
 	return { ...member, account, isMe: member.userId === ctx.userId };
 }
 

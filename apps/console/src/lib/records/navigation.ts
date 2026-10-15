@@ -9,8 +9,6 @@ export type NavContext = {
 	isSuperadmin: boolean;
 	/** An organization is active in the session. */
 	hasOrganization: boolean;
-	/** May manage the members of the active organization (owner or superadmin). */
-	canManageMembers: boolean;
 	/** The active organization subscribed to the storage option (« Accès + Stockage », §12). */
 	storageEnabled: boolean;
 };
@@ -45,7 +43,7 @@ export const NAV: NavSection[] = [
 			{ label: 'Mon organisation', href: '/mon-organisation', icon: Building },
 			{ label: 'Applications', href: '/applications', icon: AppWindow },
 			{ label: 'Stockage', href: '/stockage', icon: HardDrive, visible: (ctx) => ctx.storageEnabled },
-			{ label: 'Membres', href: '/membres', icon: Users, visible: (ctx) => ctx.canManageMembers }
+			{ label: 'Membres', href: '/membres', icon: Users }
 		]
 	},
 	{

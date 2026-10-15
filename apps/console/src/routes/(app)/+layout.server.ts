@@ -1,4 +1,3 @@
-import { can } from '$lib/records/organization';
 import { isSuperadmin } from '$lib/records/roles';
 import type { NavContext } from '$lib/records/navigation';
 import type { LayoutServerLoad } from './$types';
@@ -13,7 +12,6 @@ export const load: LayoutServerLoad = ({ locals }) => {
 	const nav: NavContext = {
 		isSuperadmin: superadmin,
 		hasOrganization: !!organization,
-		canManageMembers: !!organization && can(organization.role, superadmin, 'members.manage'),
 		storageEnabled: !!organization?.storageEnabled
 	};
 	return { user, organization, isSuperadmin: superadmin, nav };

@@ -11,9 +11,9 @@ export type MemberListItem = {
 	isMe: boolean;
 	/** Disabled: no sign-in possible, the account and its memberships are kept. */
 	disabled: boolean;
-	/** Also a member of another organization: only the superadmin may edit it (§30). */
+	/** Also a member of another organization: a change applies there too (§30). */
 	shared: boolean;
-	/** May the viewer edit, disable, sign out or reset this account? */
+	/** May the viewer edit, disable, sign out or reset this account? (the superadmin only, §32) */
 	editable: boolean;
 	/** The superadmin's account (shown with its own badge). */
 	isSuperadmin: boolean;

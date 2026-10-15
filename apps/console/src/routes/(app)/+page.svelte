@@ -34,9 +34,7 @@
 			</dl>
 			<div class="links">
 				<Button variant="outline" icon={AppWindow} href="/applications">Applications</Button>
-				{#if data.nav.canManageMembers}
-					<Button variant="outline" icon={Users} href="/membres">Membres</Button>
-				{/if}
+				<Button variant="outline" icon={Users} href="/membres">Membres</Button>
 			</div>
 		</Card>
 	{:else}
