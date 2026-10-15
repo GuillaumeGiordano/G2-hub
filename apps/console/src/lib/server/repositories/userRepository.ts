@@ -105,6 +105,43 @@ export function markEmailVerified(userId: string) {
 	return prisma.user.update({ where: { id: userId }, data: { emailVerified: true }, select: { id: true } });
 }
 
+function consoleAccountsWhere(search?: string): Prisma.UserWhereInput {
+	return {
+		role: { not: 'superadmin' },
+		...(search && {
+			OR: [
+				{ name: { contains: search, mode: 'insensitive' } },
+				{ email: { contains: search, mode: 'insensitive' } },
+				{ memberships: { some: { organization: { name: { contains: search, mode: 'insensitive' } } } } }
+			]
+		})
+	};
+}
+
+/** Console accounts (superadmins excluded) with their organizations — the console's « Membres ». */
+export function listConsoleAccounts(params: { search?: string; skip: number; take: number }) {
+	return prisma.user.findMany({
+		where: consoleAccountsWhere(params.search),
+		orderBy: [{ name: 'asc' }, { email: 'asc' }],
+		skip: params.skip,
+		take: params.take,
+		select: {
+			id: true,
+			name: true,
+			email: true,
+			twoFactorEnabled: true,
+			emailVerified: true,
+			disabledAt: true,
+			memberships: { orderBy: { organization: { name: 'asc' } }, select: { organization: { select: { id: true, name: true } } } },
+			sessions: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true, expiresAt: true } }
+		}
+	});
+}
+
+export function countConsoleAccounts(search?: string) {
+	return prisma.user.count({ where: consoleAccountsWhere(search) });
+}
+
 /** Delete an account (its sessions, credential and memberships cascade). */
 export function deleteUser(id: string, tx: Prisma.TransactionClient = prisma) {
 	return tx.user.delete({ where: { id }, select: { id: true } });

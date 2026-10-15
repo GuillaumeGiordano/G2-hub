@@ -2,7 +2,7 @@
 // and renders the @guillaumeg/ui <Sidebar> (desktop) and the mobile drawer. Add a link HERE only.
 import type { Component } from 'svelte';
 import { orgPath } from '$lib/utils/orgPath';
-import { AppWindow, Building, Building2, LayoutDashboard, ShieldCheck } from '@lucide/svelte';
+import { AppWindow, Building, Building2, LayoutDashboard, ShieldCheck, Users } from '@lucide/svelte';
 
 /** What the current user can reach — decides which links show. */
 export type NavContext = {
@@ -48,7 +48,9 @@ export const NAV: NavSection[] = [
 				icon: Building2,
 				visible: (ctx) => ctx.isSuperadmin,
 				alsoActive: ['/o']
-			}
+			},
+			// Every console account, with its organizations (§35).
+			{ label: 'Membres', href: '/membres', icon: Users, visible: (ctx) => ctx.isSuperadmin }
 		]
 	},
 	{

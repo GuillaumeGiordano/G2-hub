@@ -31,3 +31,18 @@ export type AddedMember = {
 	/** A new account: an invitation e-mail was sent (false = the person already had an account). */
 	invited: boolean;
 };
+
+/** A row of the console's « Membres » page: a console account and its organizations (§35). */
+export type ConsoleAccountListItem = {
+	userId: string;
+	name: string;
+	email: string;
+	organizations: { id: string; name: string }[];
+	twoFactorEnabled: boolean;
+	/** Has not chosen a password yet (invitation sent, link not used). */
+	invited: boolean;
+	disabled: boolean;
+	/** Holds a console session that has not expired. */
+	signedIn: boolean;
+	lastActiveAt: Date | null;
+};

@@ -78,6 +78,21 @@ export function countActiveOwners(organizationId: string) {
 	return prisma.membership.count({ where: { organizationId, role: 'OWNER', user: { ...NOT_SUPERADMIN, disabledAt: null } } });
 }
 
+/** The names of a user's organizations (an invitation says which ones it opens). */
+export async function findOrganizationNamesOfUser(userId: string) {
+	const rows = await prisma.membership.findMany({
+		where: { userId },
+		orderBy: { organization: { name: 'asc' } },
+		select: { organization: { select: { id: true, name: true } } }
+	});
+	return rows.map((r) => r.organization);
+}
+
+/** Remove a user from an organization (by organization + user). */
+export function deleteMembershipOfUser(organizationId: string, userId: string, tx: Prisma.TransactionClient = prisma) {
+	return tx.membership.deleteMany({ where: { organizationId, userId } });
+}
+
 export function countMembershipsOfUser(userId: string, tx: Prisma.TransactionClient = prisma) {
 	return tx.membership.count({ where: { userId } });
 }

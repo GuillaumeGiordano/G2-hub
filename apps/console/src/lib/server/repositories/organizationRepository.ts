@@ -122,6 +122,16 @@ export function updateOrganizationInternal(
 	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
 
+/** Every organization, by name (the « organisations » choice of the console's forms). */
+export function listOrganizationNames() {
+	return prisma.organization.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } });
+}
+
+/** The organizations among these ids that exist. */
+export function listOrganizationNamesByIds(ids: string[]) {
+	return prisma.organization.findMany({ where: { id: { in: ids } }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
+}
+
 export function countOrganizations(search: string | undefined, visibleTo: string | null) {
 	return prisma.organization.count({ where: visibleWhere(search, visibleTo) });
 }

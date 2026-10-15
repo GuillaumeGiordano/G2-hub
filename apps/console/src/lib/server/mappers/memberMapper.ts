@@ -1,5 +1,5 @@
 import type { OrgRole } from '$lib/records/organization';
-import type { MemberListItem } from '$lib/viewmodels/member';
+import type { ConsoleAccountListItem, MemberListItem } from '$lib/viewmodels/member';
 
 type MemberRow = {
 	id: string;
@@ -38,6 +38,32 @@ export function toMemberListItem(
 		shared,
 		// Console accounts are the superadmin's to manage (§32).
 		editable: viewer.isSuperadmin,
+		signedIn: !!last && last.expiresAt > now,
+		lastActiveAt: last?.updatedAt ?? null
+	};
+}
+
+type ConsoleAccountRow = {
+	id: string;
+	name: string;
+	email: string;
+	twoFactorEnabled: boolean;
+	emailVerified: boolean;
+	disabledAt: Date | null;
+	memberships: { organization: { id: string; name: string } }[];
+	sessions: { updatedAt: Date; expiresAt: Date }[];
+};
+
+export function toConsoleAccountListItem(row: ConsoleAccountRow, now = new Date()): ConsoleAccountListItem {
+	const last = row.sessions[0];
+	return {
+		userId: row.id,
+		name: row.name,
+		email: row.email,
+		organizations: row.memberships.map((m) => m.organization),
+		twoFactorEnabled: row.twoFactorEnabled,
+		invited: !row.emailVerified,
+		disabled: row.disabledAt !== null,
 		signedIn: !!last && last.expiresAt > now,
 		lastActiveAt: last?.updatedAt ?? null
 	};
