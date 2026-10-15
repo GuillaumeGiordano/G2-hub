@@ -3,7 +3,7 @@ import { auth } from '$lib/server/auth';
 import { isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
 import {
 	membershipsOf,
-	resolveActiveOrganization,
+	resolveDefaultOrganization,
 	resolveOrganizationOfAddress
 } from '$lib/server/services/organizationService';
 import { startMediaWorker } from '$lib/server/media/worker';
@@ -74,10 +74,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const actor = { id: session.user.id, isSuperadmin: isSuperadmin(session.user.role) };
 		const memberships = await membershipsOf(actor.id);
 		// On an organization's page, the organization is the one of the ADDRESS — re-checked here
-		// against the memberships, on every request; anywhere else, the last one opened (§13).
+		// against the memberships, on every request; anywhere else, the only organization of a
+		// member of one (§34). Nothing is stored on the session.
 		const organization = (event.route.id ?? '').startsWith(ORGANIZATION_ROUTE)
-			? await resolveOrganizationOfAddress(session.session, actor, memberships, event.params.org ?? '')
-			: await resolveActiveOrganization(session.session, actor, memberships);
+			? await resolveOrganizationOfAddress(actor, memberships, event.params.org ?? '')
+			: await resolveDefaultOrganization(memberships);
 		event.locals.organization = organization;
 		event.locals.orgContext = organization
 			? { userId: actor.id, isSuperadmin: actor.isSuperadmin, organization }

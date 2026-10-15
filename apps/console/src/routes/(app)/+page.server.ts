@@ -10,5 +10,5 @@ export const load: PageServerLoad = ({ locals }) => {
 		if (locals.membershipCount === 1 && locals.organization) redirect(303, orgPath(locals.organization.id));
 		redirect(303, '/mes-organisations');
 	}
-	return { lastOrganization: locals.organization ? { id: locals.organization.id, name: locals.organization.name } : null };
+	return {};
 };

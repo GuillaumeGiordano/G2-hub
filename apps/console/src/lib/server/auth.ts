@@ -29,14 +29,6 @@ export const auth = betterAuth({
 		}
 	},
 
-	session: {
-		additionalFields: {
-			// The organization the console works in — written server-side only, after checking the
-			// membership (organizationService.resolveOrganizationOfAddress / resolveActiveOrganization).
-			activeOrganizationId: { type: 'string', required: false, input: false }
-		}
-	},
-
 	emailAndPassword: {
 		enabled: true,
 		disableSignUp: true,

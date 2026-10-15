@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { Button, EmptyState } from '@guillaumeg/ui';
-	import { ArrowRight, Building2 } from '@lucide/svelte';
+	import { EmptyState } from '@guillaumeg/ui';
+	import { Building2 } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
-	import { orgPath } from '$lib/utils/orgPath';
 	import type { PageData } from './$types';
 
 	// The superadmin's home (an Admin is sent to its organization). More indicators will join later.
@@ -10,13 +9,7 @@
 </script>
 
 <div class="page">
-	<SuperTitle headingLevel="h1" title="Tableau de bord" slogan={`Bienvenue, ${data.user.name}.`}>
-		{#if data.lastOrganization}
-			<Button variant="outline" icon={ArrowRight} href={orgPath(data.lastOrganization.id)}>
-				Reprendre : {data.lastOrganization.name}
-			</Button>
-		{/if}
-	</SuperTitle>
+	<SuperTitle headingLevel="h1" title="Tableau de bord" slogan={`Bienvenue, ${data.user.name}.`} />
 
 	<EmptyState
 		icon={Building2}

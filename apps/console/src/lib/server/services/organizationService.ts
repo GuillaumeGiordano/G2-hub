@@ -1,7 +1,6 @@
 import { prisma } from '$lib/server/db';
 import * as orgRepo from '$lib/server/repositories/organizationRepository';
 import * as membershipRepo from '$lib/server/repositories/membershipRepository';
-import * as sessionRepo from '$lib/server/repositories/sessionRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
 import * as userRepo from '$lib/server/repositories/userRepository';
 import * as storage from '$lib/server/storage/s3';
@@ -212,7 +211,7 @@ export async function removeOrganizationLogo(ctx: OrgContext): Promise<void> {
 	await storage.deleteObjects('PUBLIC', [previous]);
 }
 
-// ─── Active organization (stored on the session) ────────────────────────────
+// ─── The organization of a request ──────────────────────────────────────────
 
 /** The memberships of a user (role per organization) — used by the hook. */
 export function membershipsOf(userId: string) {
@@ -220,39 +219,23 @@ export function membershipsOf(userId: string) {
 }
 
 /**
- * Resolve the organization a session works in. The stored id is re-checked on every request
- * (membership revoked, organization deleted…). A member of exactly one organization gets it
- * selected automatically.
+ * Outside an organization's pages (/securite, /mes-organisations, the home…): the organization of a
+ * member of exactly ONE organization — its menu stays the same everywhere. Anyone else (several
+ * organizations, the superadmin) has none: nothing is remembered between requests (§34).
  */
-export async function resolveActiveOrganization(
-	session: { id: string; activeOrganizationId?: string | null },
-	actor: Actor,
+export async function resolveDefaultOrganization(
 	memberships: { organizationId: string; role: OrgRole }[]
 ): Promise<ActiveOrganization | null> {
-	let orgId = session.activeOrganizationId ?? null;
-	let role: OrgRole | null = memberships.find((m) => m.organizationId === orgId)?.role ?? null;
-
-	if (orgId && !role && !actor.isSuperadmin) orgId = null; // no longer a member
-	if (!orgId && memberships.length === 1) {
-		orgId = memberships[0].organizationId;
-		role = memberships[0].role;
-	}
-
-	const org = orgId ? await orgRepo.findOrganizationById(orgId) : null;
-	const resolvedId = org?.id ?? null;
-	if (resolvedId !== (session.activeOrganizationId ?? null)) {
-		await sessionRepo.setActiveOrganization(session.id, resolvedId);
-	}
-	return org ? toActiveOrganization(org, role) : null;
+	if (memberships.length !== 1) return null;
+	const org = await orgRepo.findOrganizationById(memberships[0].organizationId);
+	return org ? toActiveOrganization(org, memberships[0].role) : null;
 }
 
 /**
  * The organization of an address (/o/<id>/…) if the actor may open it — a member, or the
- * superadmin — else null (the hook answers 404). It becomes the session's last opened organization
- * (the menu of the pages outside an organization, the redirects of the former addresses).
+ * superadmin — else null (the hook answers 404). Checked on every request, nothing stored.
  */
 export async function resolveOrganizationOfAddress(
-	session: { id: string; activeOrganizationId?: string | null },
 	actor: Actor,
 	memberships: { organizationId: string; role: OrgRole }[],
 	organizationId: string
@@ -260,9 +243,7 @@ export async function resolveOrganizationOfAddress(
 	const role = memberships.find((m) => m.organizationId === organizationId)?.role ?? null;
 	if (!role && !actor.isSuperadmin) return null;
 	const org = await orgRepo.findOrganizationById(organizationId);
-	if (!org) return null;
-	if (org.id !== (session.activeOrganizationId ?? null)) await sessionRepo.setActiveOrganization(session.id, org.id);
-	return toActiveOrganization(org, role);
+	return org ? toActiveOrganization(org, role) : null;
 }
 
 /** The organization of an application, if the actor may open it (former /applications/<id> links). */

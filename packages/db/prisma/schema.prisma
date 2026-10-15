@@ -78,8 +78,6 @@ model Organization {
   files        StoredFile[]
   apiKeys      ApiKey[]
   appUsers     AppUser[]
-  /// Sessions currently working in this organization (cleared if it is deleted).
-  sessions     Session[]
 }
 
 /// A console account's rights inside ONE organization (an account may belong to several).
@@ -382,11 +380,6 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  /// The organization the console is currently working in. Always set server-side after checking
-  /// the membership (never trusted from the browser) — DECISIONS.md §13.
-  activeOrganizationId String?
-  activeOrganization   Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("session")
