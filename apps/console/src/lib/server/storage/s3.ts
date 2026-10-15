@@ -6,6 +6,7 @@ import {
 	S3Client
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { env } from '$env/dynamic/private';
@@ -18,7 +19,7 @@ import type { Visibility } from '$lib/records/storage';
 // `forcePathStyle` + the "when required" checksums are needed by MinIO / Ceph (Infomaniak): the
 // SDK's default CRC32 checksums break presigned uploads there.
 function createClient() {
-	return new S3Client({
+	const client = new S3Client({
 		endpoint: env.S3_ENDPOINT,
 		region: env.S3_REGION || 'us-east-1',
 		forcePathStyle: true,
@@ -29,6 +30,19 @@ function createClient() {
 			secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? ''
 		}
 	});
+	// Swift (Infomaniak) refuses a multi-object delete without Content-MD5, which recent SDKs no
+	// longer send (they use CRC32 checksums instead). Add it back before signing; MinIO accepts it too.
+	client.middlewareStack.add(
+		(next, context) => async (args) => {
+			const request = args.request as { headers: Record<string, string>; body?: unknown };
+			if (context.commandName === 'DeleteObjectsCommand' && typeof request.body === 'string') {
+				request.headers['content-md5'] = createHash('md5').update(request.body).digest('base64');
+			}
+			return next(args);
+		},
+		{ step: 'build', name: 'contentMd5ForDeleteObjects' }
+	);
+	return client;
 }
 
 const globalForS3 = globalThis as unknown as { s3?: S3Client };
