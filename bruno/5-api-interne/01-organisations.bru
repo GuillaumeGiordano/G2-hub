@@ -1,0 +1,30 @@
+meta {
+  name: Organisations
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{hubUrl}}/api/internal/v1/organizations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{internalToken}}
+}
+
+script:post-response {
+  const list = res.body.organizations || res.body;
+  if (Array.isArray(list) && list[0]) bru.setVar("orgId", list[0].id);
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  404 if INTERNAL_API_TOKEN is empty in the hub .env (the internal API does not exist).
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Jeton membre (OAuth2) puis userinfo
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{hubUrl}}/oauth/userinfo
+  body: none
+  auth: oauth2
+}
+
+auth:oauth2 {
+  grant_type: authorization_code
+  callback_url: {{portalCallback}}
+  authorization_url: {{hubUrl}}/oauth/authorize
+  access_token_url: {{hubUrl}}/oauth/token
+  client_id: {{clientId}}
+  client_secret: {{clientSecret}}
+  scope: openid email profile
+  pkce: true
+}
+
+script:post-response {
+  // Keep the member's access token for the personal-space requests.
+  const auth = req.getHeader("Authorization") || req.getHeader("authorization") || "";
+  if (auth.startsWith("Bearer ")) bru.setVar("userToken", auth.slice(7));
+}
+
+docs {
+  In the Bruno app: Auth tab, « Get Access Token » opens the hub sign-in page; sign in as a PORTAL member (not a console admin). Then send: the script stores the token in `userToken` (valid 1 h). Not runnable from the CLI.
+}

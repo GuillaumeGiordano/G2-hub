@@ -1,0 +1,29 @@
+meta {
+  name: Épingler
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{hubUrl}}/api/v1/files/{{fileId}}/pins/bruno:test
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  PUT /api/v1/files/:id/pins/:ref: the site uses the file, it can no longer be deleted.
+}

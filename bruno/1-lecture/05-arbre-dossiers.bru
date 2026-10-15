@@ -1,0 +1,30 @@
+meta {
+  name: Arbre des dossiers (clé secrète)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{hubUrl}}/api/v1/folders/tree
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+script:post-response {
+  const g = (res.body.folders || []).find((f) => f.path.toLowerCase() === bru.getEnvVar("galleryPath").toLowerCase());
+  if (g) bru.setVar("galleryFolderId", g.id);
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/folders/tree: every folder with its full path. Secret key only (403 with a publishable key).
+}

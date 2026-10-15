@@ -1,0 +1,25 @@
+meta {
+  name: Un fichier
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{hubUrl}}/api/v1/files/{{galleryFileId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{publicKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/files/:id. Run « Fichiers de la galerie » first (sets galleryFileId).
+}

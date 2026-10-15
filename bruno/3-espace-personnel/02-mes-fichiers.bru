@@ -1,0 +1,29 @@
+meta {
+  name: Mes fichiers (public)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{hubUrl}}/api/v1/me/files?space=public
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-G2-User-Token: {{userToken}}
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/me/files?space=public|private
+}

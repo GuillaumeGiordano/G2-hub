@@ -1,0 +1,29 @@
+meta {
+  name: Confirmer l'envoi
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{hubUrl}}/api/v1/uploads/{{fileId}}/complete
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  POST /api/v1/uploads/:id/complete: process the file (an image is READY at once, a video goes PROCESSING).
+}

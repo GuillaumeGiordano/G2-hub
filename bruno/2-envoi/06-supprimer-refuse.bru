@@ -1,0 +1,25 @@
+meta {
+  name: Supprimer (refusé : épinglé)
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{hubUrl}}/api/v1/files/{{fileId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("409 : fichier épinglé", function () {
+    expect(res.status).to.equal(409);
+  });
+}

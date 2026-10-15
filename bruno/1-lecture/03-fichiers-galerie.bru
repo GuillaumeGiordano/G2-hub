@@ -1,0 +1,29 @@
+meta {
+  name: Fichiers de la galerie
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{hubUrl}}/api/v1/files?path={{galleryPath}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{publicKey}}
+}
+
+script:post-response {
+  if (res.body.files && res.body.files[0]) bru.setVar("galleryFileId", res.body.files[0].id);
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/files?path=...: READY files of a folder, newest first.
+}

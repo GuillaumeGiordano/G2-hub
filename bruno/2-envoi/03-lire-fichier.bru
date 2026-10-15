@@ -1,0 +1,21 @@
+meta {
+  name: Lire le fichier
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{hubUrl}}/api/v1/files/{{fileId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}

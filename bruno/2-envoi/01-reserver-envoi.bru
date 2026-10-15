@@ -1,0 +1,50 @@
+meta {
+  name: Réserver un envoi (+ PUT d'une image de test)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{hubUrl}}/api/v1/uploads
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+body:json {
+  {
+    "path": "{{galleryPath}}",
+    "name": "bruno-test.png",
+    "size": {{pngSize}},
+    "contentType": "image/png",
+    "alt": "Image de test envoyée par Bruno"
+  }
+}
+
+script:pre-request {
+  // A 1x1 PNG: the declared size must be its exact size.
+  bru.setVar("pngBase64", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+  bru.setVar("pngSize", Buffer.from(bru.getVar("pngBase64"), "base64").length);
+}
+
+script:post-response {
+  // Step 2 of the upload: PUT the bytes to the signed URL (straight to storage, no key).
+  const axios = require("axios");
+  bru.setVar("fileId", res.body.fileId);
+  await axios.put(res.body.uploadUrl, Buffer.from(bru.getVar("pngBase64"), "base64"), {
+    headers: { "content-type": res.body.contentType }
+  });
+}
+
+tests {
+  test("201", function () {
+    expect(res.status).to.equal(201);
+  });
+}
+
+docs {
+  POST /api/v1/uploads: reserve (type, size, quota checked) and get the signed URL. The post-response script PUTs a test image to it.
+}

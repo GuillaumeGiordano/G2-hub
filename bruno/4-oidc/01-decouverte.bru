@@ -1,0 +1,21 @@
+meta {
+  name: Découverte
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{hubUrl}}/.well-known/openid-configuration
+  body: none
+  auth: none
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Everything an OIDC library needs: authorize, token, userinfo and jwks endpoints, supported methods.
+}

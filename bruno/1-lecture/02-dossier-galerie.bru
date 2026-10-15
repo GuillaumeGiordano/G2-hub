@@ -1,0 +1,25 @@
+meta {
+  name: Dossier Galerie et sous-dossiers
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{hubUrl}}/api/v1/folders?path={{galleryPath}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{publicKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/folders?path=... (or ?folder=<id>).
+}

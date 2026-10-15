@@ -1,0 +1,37 @@
+meta {
+  name: Inviter un membre du portail
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{hubUrl}}/api/v1/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+body:json {
+  {
+    "name": "Membre Bruno",
+    "email": "{{inviteEmail}}",
+    "role": "USER"
+  }
+}
+
+script:pre-request {
+  bru.setVar("inviteEmail", `bruno-${Date.now()}@example.test`);
+}
+
+tests {
+  test("201", function () {
+    expect(res.status).to.equal(201);
+  });
+}
+
+docs {
+  POST /api/v1/users: creates a REAL member and sends the invitation e-mail (Mailpit in dev). Roles: SUPER_USER, USER, GUEST. Delete test members from the console.
+}

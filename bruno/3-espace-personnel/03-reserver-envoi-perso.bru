@@ -1,0 +1,38 @@
+meta {
+  name: Réserver un envoi personnel
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{hubUrl}}/api/v1/me/uploads
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-G2-User-Token: {{userToken}}
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+body:json {
+  {
+    "space": "private",
+    "name": "justificatif.pdf",
+    "size": 1024,
+    "contentType": "application/pdf"
+  }
+}
+
+tests {
+  test("201", function () {
+    expect(res.status).to.equal(201);
+  });
+}
+
+docs {
+  POST /api/v1/me/uploads: then PUT the bytes to uploadUrl and confirm with POST /api/v1/uploads/:id/complete (same token header). An unconfirmed upload is removed after 1 h.
+}

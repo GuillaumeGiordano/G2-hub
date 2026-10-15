@@ -1,0 +1,25 @@
+meta {
+  name: Libérer
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{hubUrl}}/api/v1/files/{{fileId}}/pins/bruno:test
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}

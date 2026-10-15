@@ -1,0 +1,31 @@
+meta {
+  name: Changer le forfait
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{hubUrl}}/api/internal/v1/organizations/{{orgId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{internalToken}}
+}
+
+body:json {
+  {
+    "storageEnabled": true
+  }
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Changes the REAL plan of the organization. Body: { quotaBytes?: 1, 5 or 20 GB in bytes, storageEnabled?: boolean }.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Supprimer
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{hubUrl}}/api/v1/files/{{fileId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{secretKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}

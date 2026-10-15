@@ -1,0 +1,25 @@
+meta {
+  name: Dossiers racine
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{hubUrl}}/api/v1/folders
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{publicKey}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/folders: root folders the key may see (a publishable key: public folders only).
+}

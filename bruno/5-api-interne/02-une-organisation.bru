@@ -1,0 +1,21 @@
+meta {
+  name: Une organisation
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{hubUrl}}/api/internal/v1/organizations/{{orgId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{internalToken}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+  });
+}
