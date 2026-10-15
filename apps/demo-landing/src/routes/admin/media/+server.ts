@@ -12,6 +12,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		const listing = await hub.media({
 			kind: 'IMAGE',
 			q: url.searchParams.get('q') || undefined,
+			folder: url.searchParams.get('folder') || undefined,
 			page: Number(url.searchParams.get('page')) || 1,
 			perPage: 12
 		});

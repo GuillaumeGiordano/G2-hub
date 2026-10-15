@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { Alert, Badge, Button, Card, EmptyState, FileInput, Input, Progress, Table, Textarea } from '@guillaumeg/ui';
+	import { Alert, Badge, Button, Card, EmptyState, FileInput, Input, Progress, Select, Table, Textarea } from '@guillaumeg/ui';
 	import { ImagePlus, Plus, Trash2 } from '@lucide/svelte';
 	import MediaPicker, { type PickedMedia } from '$lib/components/MediaPicker.svelte';
 	import type { CreationRow } from './+page.server';
@@ -22,6 +22,14 @@
 	let price = $state('');
 	let alt = $state('');
 	let caption = $state('');
+	// '' = the site's gallery (the usual case); sometimes another folder of the application.
+	let folder = $state('');
+	const folderOptions = $derived([
+		{ value: '', label: `${data.galleryPath} (galerie du site)` },
+		...data.folders
+			.filter((f) => f.path.toLowerCase() !== data.galleryPath.toLowerCase())
+			.map((f) => ({ value: f.id, label: f.visibility === 'PRIVATE' ? `${f.path} (privé)` : f.path }))
+	]);
 	let progress = $state(0);
 	let busy = $state(false);
 	let message = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -66,7 +74,7 @@
 			const t = await fetch('/admin/upload', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type, alt, caption })
+				body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type, alt, caption, folder })
 			});
 			if (!t.ok) throw new Error(await errorOf(t));
 			const ticket = (await t.json()) as { fileId: string; uploadUrl: string; contentType: string };
@@ -77,7 +85,13 @@
 				body: JSON.stringify({ title, price })
 			});
 			if (!done.ok) throw new Error(await errorOf(done));
-			message = { kind: 'success', text: `« ${title} » ajoutée : elle est sur le site et dans la médiathèque G2 Hub.` };
+			const where = folderOptions.find((o) => o.value === folder)?.label;
+			message = {
+				kind: 'success',
+				text: folder
+					? `« ${title} » ajoutée dans « ${where} » (G2 Hub) : hors de la galerie, elle n'est pas sur la page d'accueil.`
+					: `« ${title} » ajoutée : elle est sur le site et dans la médiathèque G2 Hub.`
+			};
 			file = null;
 			title = price = alt = caption = '';
 			round++;
@@ -149,6 +163,15 @@
 				<Input label="Titre" bind:value={title} required placeholder="Croissant pur beurre" />
 				<Input label="Prix (€)" bind:value={price} placeholder="1,40" />
 			</div>
+			{#if folderOptions.length > 1}
+				<Select
+					label="Dossier"
+					bind:value={folder}
+					options={folderOptions}
+					placeholder=""
+					hint="La page d'accueil n'affiche que la galerie : une photo rangée ailleurs n'y apparaît pas."
+				/>
+			{/if}
 			<Input label="Texte alternatif" bind:value={alt} placeholder="Croissant doré sur une planche en bois" />
 			<Textarea label="Légende" bind:value={caption} rows={2} placeholder="Feuilleté au beurre AOP, cuit chaque matin." />
 			{#if busy}<Progress value={progress} showValue label="Envoi de la photo" />{/if}
@@ -183,7 +206,7 @@
 				{:else}
 					<span class="muted">Aucune photo choisie.</span>
 				{/if}
-				<MediaPicker endpoint="/admin/media" onselect={(m) => (picked = m)} />
+				<MediaPicker endpoint="/admin/media" foldersEndpoint="/admin/folders" onselect={(m) => (picked = m)} />
 			</div>
 			<input type="hidden" name="fileId" value={picked?.id ?? ''} />
 			<div class="row">

@@ -4,20 +4,24 @@
 </script>
 
 <script lang="ts">
-	import { Alert, Button, Input, Modal, Pagination } from '@guillaumeg/ui';
+	import { Alert, Button, Input, Modal, Pagination, Select } from '@guillaumeg/ui';
 	import { Images } from '@lucide/svelte';
 
 	// « Choisir dans la médiathèque » — copy this component into a client site's back-office. It
 	// reads `endpoint`, a route of the SITE's server that lists the images through G2 Hub with the
 	// secret key (see routes/admin/media): the key never reaches the browser. The site then stores
-	// the chosen file's ID (never its URL) and pins it.
+	// the chosen file's ID (never its URL) and pins it. With `foldersEndpoint`, a « Dossier » select
+	// narrows the list to one folder and its subfolders (DECISIONS.md §30).
 	let {
 		endpoint,
+		foldersEndpoint,
 		onselect,
 		label = 'Choisir dans la médiathèque'
 	}: {
-		/** Answers `?q=&page=` with `{ files: PickedMedia[], total, page, perPage }`. */
+		/** Answers `?q=&folder=&page=` with `{ files: PickedMedia[], total, page, perPage }`. */
 		endpoint: string;
+		/** Answers with `{ folders: { id, path }[] }` (optional: no select without it). */
+		foldersEndpoint?: string;
 		onselect: (media: PickedMedia) => void;
 		label?: string;
 	} = $props();
@@ -25,6 +29,8 @@
 	const MODAL_ID = 'media-picker';
 
 	let q = $state('');
+	let folder = $state('');
+	let folderOptions = $state<{ value: string; label: string }[]>([]);
 	let page = $state(1);
 	let files = $state<PickedMedia[]>([]);
 	let total = $state(0);
@@ -45,6 +51,7 @@
 		try {
 			const params = new URLSearchParams({ page: String(page) });
 			if (q.trim()) params.set('q', q.trim());
+			if (folder) params.set('folder', folder);
 			const res = await fetch(`${endpoint}?${params}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) throw new Error(body?.message ?? 'Médiathèque indisponible.');
@@ -58,8 +65,22 @@
 		}
 	}
 
+	/** The folders, once per page view (a failure only hides the select). */
+	async function loadFolders() {
+		if (!foldersEndpoint || folderOptions.length) return;
+		const res = await fetch(foldersEndpoint).catch(() => null);
+		const body = res?.ok ? ((await res.json()) as { folders: { id: string; path: string }[] }) : null;
+		if (body) folderOptions = [{ value: '', label: 'Tous les dossiers' }, ...body.folders.map((f) => ({ value: f.id, label: f.path }))];
+	}
+
 	function open() {
 		modal()?.showModal();
+		load();
+		loadFolders();
+	}
+
+	function onfolder() {
+		page = 1;
 		load();
 	}
 
@@ -87,14 +108,22 @@
 
 <Modal id={MODAL_ID} title="Médiathèque G2 Hub" size="lg">
 	<div class="picker">
-		<div oninput={onsearch} role="presentation">
-			<Input label="Rechercher" bind:value={q} placeholder="Nom du fichier…" />
+		<div class="filters">
+			<div oninput={onsearch} role="presentation">
+				<Input label="Rechercher" bind:value={q} placeholder="Nom du fichier…" />
+			</div>
+			{#if folderOptions.length}
+				<!-- The library Select exposes no callback: its native `change` bubbles up here. -->
+				<div onchange={onfolder} role="presentation">
+					<Select label="Dossier" bind:value={folder} options={folderOptions} placeholder="" />
+				</div>
+			{/if}
 		</div>
 
 		{#if error}
 			<Alert variant="error">{error}</Alert>
 		{:else if !loading && files.length === 0}
-			<p class="empty">Aucune image{q.trim() ? ' pour cette recherche' : ' dans la médiathèque'}.</p>
+			<p class="empty">Aucune image{q.trim() || folder ? ' pour cette recherche' : ' dans la médiathèque'}.</p>
 		{:else}
 			<ul class="grid" aria-busy={loading}>
 				{#each files as media (media.id)}
@@ -121,6 +150,16 @@
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
+	}
+	.filters {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
+	}
+	@media (max-width: 640px) {
+		.filters {
+			grid-template-columns: 1fr;
+		}
 	}
 	.grid {
 		list-style: none;

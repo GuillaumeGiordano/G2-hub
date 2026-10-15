@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { HubError, type HubFile } from '@g2/hub-client';
 import { addCreation, findCreation, listCreations, removeCreation } from '$lib/server/db';
-import { hubAdmin, pinRef } from '$lib/server/hub';
+import { galleryPath, hubAdmin, pinRef } from '$lib/server/hub';
 import type { Actions, PageServerLoad } from './$types';
 
 /** A creation of the site's database joined with its photo in G2 Hub (null if unreachable). */
@@ -28,7 +28,9 @@ export const load: PageServerLoad = async () => {
 			return { id: c.id, title: c.title, priceCents: c.priceCents, createdAt: c.createdAt, photo };
 		})
 	);
-	return { rows, configured: !!hub };
+	// The « Dossier » select of the upload form: the gallery by default, any other folder sometimes.
+	const folders = hub ? await hub.folderTree().then((t) => t.folders, () => []) : [];
+	return { rows, configured: !!hub, folders, galleryPath: galleryPath() };
 };
 
 /** A hub call whose 404 (file already gone from the hub) is not an error for the site. */

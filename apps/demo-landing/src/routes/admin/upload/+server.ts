@@ -14,11 +14,13 @@ export const POST: RequestHandler = async ({ request }) => {
 		contentType?: string;
 		alt?: string;
 		caption?: string;
+		/** A folder id chosen in the form; none = the site's gallery. */
+		folder?: string;
 	} | null;
 	if (!body?.name || !body.size || !body.contentType) error(400, 'Fichier manquant.');
 	try {
 		const ticket = await hub.createUpload({
-			path: galleryPath(),
+			...(body.folder ? { folder: body.folder } : { path: galleryPath() }),
 			name: body.name,
 			size: body.size,
 			contentType: body.contentType,
