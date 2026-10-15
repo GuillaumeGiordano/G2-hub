@@ -158,71 +158,73 @@
 	{/if}
 </div>
 
-<Modal id={FORM_MODAL_ID} title={editing ? "Modifier l'application" : 'Nouvelle application'}>
-	<form
-		method="POST"
-		action={editing ? '?/update' : '?/create'}
-		class="form"
-		novalidate
-		oninput={formErrors.oninput}
-		onfocusout={formErrors.onfocusout}
-		use:enhance={toastEnhance({
-			success: () => (editing ? 'Application mise à jour.' : 'Application créée.'),
-			onSuccess: () => modal(FORM_MODAL_ID)?.close(),
-			setBusy,
-			fields: formErrors
-		})}
-	>
-		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
-		<Input bind:value={fName} error={formErrors.get('name')} label="Nom" name="name" required />
+{#if data.canManage}
+	<Modal id={FORM_MODAL_ID} title={editing ? "Modifier l'application" : 'Nouvelle application'}>
+		<form
+			method="POST"
+			action={editing ? '?/update' : '?/create'}
+			class="form"
+			novalidate
+			oninput={formErrors.oninput}
+			onfocusout={formErrors.onfocusout}
+			use:enhance={toastEnhance({
+				success: () => (editing ? 'Application mise à jour.' : 'Application créée.'),
+				onSuccess: () => modal(FORM_MODAL_ID)?.close(),
+				setBusy,
+				fields: formErrors
+			})}
+		>
+			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
+			<Input bind:value={fName} error={formErrors.get('name')} label="Nom" name="name" required />
 
-		<TagInput
-			bind:tags={fOrigins}
-			label="Origines autorisées"
-			placeholder="https://monsite.fr puis Entrée"
-			hint="Domaines depuis lesquels un navigateur pourra appeler l'API (CORS). Sans chemin."
-			error={originsError}
-			onchange={onOriginsChange}
-		/>
-		<input type="hidden" name="origins" value={JSON.stringify(fOrigins)} />
+			<TagInput
+				bind:tags={fOrigins}
+				label="Origines autorisées"
+				placeholder="https://monsite.fr puis Entrée"
+				hint="Domaines depuis lesquels un navigateur pourra appeler l'API (CORS). Sans chemin."
+				error={originsError}
+				onchange={onOriginsChange}
+			/>
+			<input type="hidden" name="origins" value={JSON.stringify(fOrigins)} />
 
-		<div class="form-submit">
-			<Button type="submit" icon={editing ? undefined : Plus} loading={busy}>
-				{editing ? 'Enregistrer' : "Créer l'application"}
-			</Button>
-		</div>
-	</form>
-</Modal>
+			<div class="form-submit">
+				<Button type="submit" icon={editing ? undefined : Plus} loading={busy}>
+					{editing ? 'Enregistrer' : "Créer l'application"}
+				</Button>
+			</div>
+		</form>
+	</Modal>
 
-<Modal id={DELETE_MODAL_ID} title="Supprimer l'application">
-	<p class="confirm-text">
-		Supprimer <strong>{toDelete?.name}</strong> ? Le site ou portail qui l'utilise ne pourra plus
-		appeler le hub. Cette action est <strong>irréversible</strong>.
-	</p>
-	{#if toDelete?.siteFileCount}
-		<div class="warning">
-			<Alert variant="warning" title="Fichiers envoyés par le site">
-				{toDelete.siteFileCount} fichier{toDelete.siteFileCount > 1 ? 's' : ''} envoyé{toDelete.siteFileCount > 1 ? 's' : ''}
-				par le site {toDelete.siteFileCount > 1 ? 'seront supprimés' : 'sera supprimé'} : le site ne pourra plus
-				{toDelete.siteFileCount > 1 ? 'les afficher' : 'l’afficher'}.
-			</Alert>
-		</div>
-	{/if}
-	<form
-		method="POST"
-		action="?/delete"
-		class="confirm-actions"
-		use:enhance={toastEnhance({
-			success: 'Application supprimée.',
-			onSuccess: () => modal(DELETE_MODAL_ID)?.close(),
-			setBusy
-		})}
-	>
-		<input type="hidden" name="id" value={toDelete?.id} />
-		<Button type="button" variant="ghost" onclick={() => modal(DELETE_MODAL_ID)?.close()}>Annuler</Button>
-		<Button type="submit" variant="danger" icon={Trash2} loading={busy}>Supprimer définitivement</Button>
-	</form>
-</Modal>
+	<Modal id={DELETE_MODAL_ID} title="Supprimer l'application">
+		<p class="confirm-text">
+			Supprimer <strong>{toDelete?.name}</strong> ? Le site ou portail qui l'utilise ne pourra plus
+			appeler le hub. Cette action est <strong>irréversible</strong>.
+		</p>
+		{#if toDelete?.siteFileCount}
+			<div class="warning">
+				<Alert variant="warning" title="Fichiers envoyés par le site">
+					{toDelete.siteFileCount} fichier{toDelete.siteFileCount > 1 ? 's' : ''} envoyé{toDelete.siteFileCount > 1 ? 's' : ''}
+					par le site {toDelete.siteFileCount > 1 ? 'seront supprimés' : 'sera supprimé'} : le site ne pourra plus
+					{toDelete.siteFileCount > 1 ? 'les afficher' : 'l’afficher'}.
+				</Alert>
+			</div>
+		{/if}
+		<form
+			method="POST"
+			action="?/delete"
+			class="confirm-actions"
+			use:enhance={toastEnhance({
+				success: 'Application supprimée.',
+				onSuccess: () => modal(DELETE_MODAL_ID)?.close(),
+				setBusy
+			})}
+		>
+			<input type="hidden" name="id" value={toDelete?.id} />
+			<Button type="button" variant="ghost" onclick={() => modal(DELETE_MODAL_ID)?.close()}>Annuler</Button>
+			<Button type="submit" variant="danger" icon={Trash2} loading={busy}>Supprimer définitivement</Button>
+		</form>
+	</Modal>
+{/if}
 
 <style>
 	.app-link {

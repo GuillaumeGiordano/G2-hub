@@ -2,6 +2,7 @@
 	import { Badge, Button, Card, EmptyState } from '@guillaumeg/ui';
 	import { AppWindow, Building2, Users } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
+	import StorageOverview from '$lib/components/storage/StorageOverview.svelte';
 	import { formatBytes, offerLabel, orgRoleLabel } from '$lib/records/organization';
 	import type { PageData } from './$types';
 
@@ -34,9 +35,13 @@
 			</dl>
 			<div class="links">
 				<Button variant="outline" icon={AppWindow} href="/applications">Applications</Button>
-				<Button variant="outline" icon={Users} href="/membres">Membres</Button>
+				{#if data.isSuperadmin}<Button variant="outline" icon={Users} href="/membres">Membres</Button>{/if}
 			</div>
 		</Card>
+
+		{#if data.storage}
+			<StorageOverview storage={data.storage} />
+		{/if}
 	{:else}
 		<EmptyState
 			icon={Building2}

@@ -1,19 +1,16 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { Alert, Badge, Button, Card, Progress, Table } from '@guillaumeg/ui';
 	import { ArrowUpCircle } from '@lucide/svelte';
-	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { fileKindLabel } from '$lib/records/files';
 	import { formatBytes, usageLevelColor } from '$lib/records/organization';
 	import type { StorageOverview } from '$lib/viewmodels/storage';
-	import type { PageData } from './$types';
 
-	// The organization's « disk space »: how full the quota is, and what fills it — to clean up or
-	// to ask for the next tier (the request itself happens on the G2 WebDev portal).
-	let { data }: { data: PageData } = $props();
+	// The organization's « disk space », shown on the dashboard (§33): how full the quota is, and
+	// what fills it — to clean up or to ask for the next tier (the request itself happens on the
+	// G2 WebDev portal).
+	let { storage }: { storage: StorageOverview } = $props();
 
-	const s = $derived(data.storage);
-	const organizationName = $derived((page.data.organization as { name: string }).name);
+	const s = $derived(storage);
 	const filesLabel = (n: number) => `${n} fichier${n > 1 ? 's' : ''}`;
 
 	type AppRow = StorageOverview['byApplication'][number];
@@ -40,13 +37,16 @@
 	<span class="muted">{s.usedBytes > 0 ? `${row.percent} %` : '—'}</span>
 {/snippet}
 
-<div class="page">
-	<SuperTitle headingLevel="h1" title="Stockage" slogan={`L'espace de ${organizationName}, toutes applications confondues.`}>
-		<Badge label={`Forfait ${formatBytes(s.quotaBytes)}`} variant="default" />
-		{#if s.upgradeUrl && s.nextQuotaBytes}
-			<Button href={s.upgradeUrl} icon={ArrowUpCircle}>Demander plus d'espace</Button>
-		{/if}
-	</SuperTitle>
+<section class="storage">
+	<div class="head">
+		<h2>Stockage</h2>
+		<div class="head-actions">
+			<Badge label={`Forfait ${formatBytes(s.quotaBytes)}`} variant="default" />
+			{#if s.upgradeUrl && s.nextQuotaBytes}
+				<Button href={s.upgradeUrl} size="sm" icon={ArrowUpCircle}>Demander plus d'espace</Button>
+			{/if}
+		</div>
+	</div>
 
 	<Card>
 		<div class="gauge">
@@ -77,7 +77,7 @@
 		</Alert>
 	{/if}
 
-	<h2>Par application</h2>
+	<h3>Par application</h3>
 	<Table
 		rows={s.byApplication}
 		emptyLabel="Aucune application."
@@ -95,7 +95,7 @@
 		</p>
 	{/if}
 
-	<h2>Par type de fichier</h2>
+	<h3>Par type de fichier</h3>
 	<Table
 		rows={s.byKind}
 		columns={[
@@ -110,7 +110,7 @@
 		Seules les versions traitées comptent (images en WebP, vidéos transcodées) ; un envoi en cours
 		réserve sa taille annoncée. Supprimer un fichier libère son espace immédiatement.
 	</p>
-</div>
+</section>
 
 <style>
 	.gauge {
@@ -118,7 +118,30 @@
 		flex-direction: column;
 		gap: 10px;
 	}
+	.storage {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.head-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
 	h2 {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-heading);
+	}
+	h3 {
 		margin: 8px 0 0;
 		font-size: 16px;
 		font-weight: 600;

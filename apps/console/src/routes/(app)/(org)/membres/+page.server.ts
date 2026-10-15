@@ -1,27 +1,21 @@
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { checkbox, parseForm, requiredString } from '$lib/validation';
-import { can } from '$lib/records/organization';
 import { memberAddSchema, memberUpdateSchema } from '$lib/schemas/member';
 import { actionFailure, loadFailure } from '$lib/server/http';
 import * as memberService from '$lib/server/services/memberService';
 import type { Actions, PageServerLoad } from './$types';
 
-// Every member sees the list; only the superadmin adds, edits or removes members — the service
-// answers 403 to anyone else (DECISIONS.md §32). The (org) group guarantees an active organization:
-// `locals.orgContext` is set (hooks.server.ts).
+// The superadmin's page (DECISIONS.md §32, §33): the service answers 403 to anyone else, list
+// included. The (org) group guarantees an active organization: `locals.orgContext` is set
+// (hooks.server.ts).
 const memberSchema = z.object({ membershipId: requiredString() });
 const disableSchema = z.object({ membershipId: requiredString(), disabled: checkbox() });
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const search = url.searchParams.get('q')?.trim() || undefined;
 	try {
-		const ctx = locals.orgContext!;
-		return {
-			members: await memberService.listMembers(ctx, search),
-			searching: !!search,
-			canManage: can(ctx.organization.role, ctx.isSuperadmin, 'members.manage')
-		};
+		return { members: await memberService.listMembers(locals.orgContext!, search), searching: !!search };
 	} catch (err) {
 		loadFailure(err);
 	}

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Badge, Button, Card, FileInput, Input, Progress, Select, Switch, Textarea } from '@guillaumeg/ui';
-	import { AppWindow, ArrowLeftRight, Building, HardDrive, ImageUp, Save, Trash2, Users } from '@lucide/svelte';
+	import { AppWindow, ArrowLeftRight, Building, ImageUp, Save, Trash2, Users } from '@lucide/svelte';
+	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
+	import { organizationTabs } from '$lib/records/navigation';
 	import {
 		formatBytes,
 		legalFormOptions,
@@ -69,6 +71,7 @@
 			<Button variant="outline" icon={ArrowLeftRight} href="/choisir-organisation">Changer d'organisation</Button>
 		{/if}
 	</SuperTitle>
+	<PageTabs tabs={organizationTabs} />
 
 	<div class="top">
 		<Card>
@@ -142,8 +145,7 @@
 			{/if}
 			<div class="links">
 				<Button variant="outline" size="sm" icon={AppWindow} href="/applications">Applications</Button>
-				{#if org.storageEnabled}<Button variant="outline" size="sm" icon={HardDrive} href="/stockage">Stockage</Button>{/if}
-				<Button variant="outline" size="sm" icon={Users} href="/membres">Membres</Button>
+				{#if org.isSuperadmin}<Button variant="outline" size="sm" icon={Users} href="/membres">Membres</Button>{/if}
 			</div>
 		</Card>
 	</div>

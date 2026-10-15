@@ -9,6 +9,12 @@ import type { ApplicationListItem } from '$lib/viewmodels/application';
 // Applications of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13). Every
 // member sees them; owners (and the superadmin) create, edit and delete them.
 
+/** The ids of the active organization's applications (menu). */
+export function applicationIds(ctx: OrgContext): Promise<string[]> {
+	assertCan(ctx, 'read');
+	return appRepo.listApplicationIds(ctx.organization.id);
+}
+
 export async function listApplications(ctx: OrgContext): Promise<ApplicationListItem[]> {
 	assertCan(ctx, 'read');
 	const [apps, siteFiles] = await Promise.all([

@@ -17,7 +17,6 @@ export const SUPERADMIN_LABEL = 'Superadmin';
  *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
 export type OrgPermission =
 	| 'organization.manage'
-	| 'members.read'
 	| 'members.manage'
 	| 'applications.manage'
 	| 'appUsers.manage'
@@ -25,10 +24,11 @@ export type OrgPermission =
 	| 'read';
 
 const PERMISSIONS: Record<OrgRole, readonly OrgPermission[]> = {
-	// No `members.manage` nor `applications.manage`: console accounts, applications, their API keys
-	// and their « Se connecter avec G2 Hub » settings are the superadmin's (§32) — G2 Webdev builds
-	// the client's sites. An Admin manages its applications' files and users, and its profile.
-	OWNER: ['organization.manage', 'members.read', 'appUsers.manage', 'files.write', 'read']
+	// No `members.manage` nor `applications.manage`: console accounts (even their list), applications,
+	// their API keys and their « Se connecter avec G2 Hub » settings are the superadmin's (§32, §33) —
+	// G2 Webdev builds the client's sites. An Admin manages its applications' files and users, and
+	// its organization's profile.
+	OWNER: ['organization.manage', 'appUsers.manage', 'files.write', 'read']
 };
 
 /** `role` null = the superadmin working in an organization it is not a member of. */

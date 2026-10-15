@@ -215,9 +215,7 @@
 		slogan={`Les admins de ${organizationName} : ils gèrent la console et se connectent aux back-offices de ses applications.`}
 	>
 		<Badge label={`${data.members.length} membre${data.members.length > 1 ? 's' : ''}`} variant="default" />
-		{#if data.canManage}
-			<Button icon={Plus} onclick={openAdd}>Ajouter un membre</Button>
-		{/if}
+		<Button icon={Plus} onclick={openAdd}>Ajouter un membre</Button>
 	</SuperTitle>
 
 	<SearchFilters collapsible columns={1} loading={!!navigating.to} title="Rechercher" urlDriven>
@@ -232,21 +230,13 @@
 			{ key: 'role', label: 'Rôle', cell: roleCell },
 			{ key: 'twoFactorEnabled', label: 'Double authentification', cell: twoFactorCell },
 			{ key: 'lastActiveAt', label: 'Activité', cell: activityCell },
-			...(data.canManage ? [{ key: 'membershipId' as const, label: '', align: 'right' as const, cell: actionsCell }] : [])
+			{ key: 'membershipId', label: '', align: 'right', cell: actionsCell }
 		]}
 	/>
-	{#if data.canManage}
-		<p class="hint">
-			Un compte partagé appartient aussi à une autre organisation : vos changements s'y appliquent
-			aussi.
-		</p>
-	{:else}
-		<p class="hint">
-			Les accès à la console sont gérés par votre prestataire : pour ajouter ou retirer un membre,
-			contactez-le. Les utilisateurs de vos applications se gèrent dans l'onglet
-			« Utilisateurs » de chaque application.
-		</p>
-	{/if}
+	<p class="hint">
+		Un compte partagé appartient aussi à une autre organisation : vos changements s'y appliquent
+		aussi.
+	</p>
 </div>
 
 <form

@@ -10,15 +10,15 @@ import type { OrgRole } from '$lib/records/organization';
 import type { AddedMember, MemberListItem } from '$lib/viewmodels/member';
 
 // Members of the ACTIVE organization (ctx comes from the session — DECISIONS.md §13); every member
-// is an Admin (§26). Console accounts are the operator's: only the SUPERADMIN adds, edits, signs
-// out, disables or removes them (§32). An Admin sees the list (`members.read`) and manages the
-// users of its applications instead. An organization always keeps at least one (enabled) Admin.
+// is an Admin (§26). Console accounts are the operator's: only the SUPERADMIN lists, adds, edits,
+// signs out, disables or removes them (§32, §33) — an Admin gets a 403 and manages the users of its
+// applications instead. An organization always keeps at least one (enabled) Admin.
 
 /** How long a reset link must wait before another one is sent (same window as auth.ts). */
 const RESET_THROTTLE_MS = 2 * 60_000;
 
 export async function listMembers(ctx: OrgContext, search?: string): Promise<MemberListItem[]> {
-	assertCan(ctx, 'members.read');
+	assertCan(ctx, 'members.manage');
 	const rows = await membershipRepo.listMembers(ctx.organization.id, search);
 	const now = new Date();
 	return rows.map((r) => toMemberListItem(r, { userId: ctx.userId, isSuperadmin: ctx.isSuperadmin }, now));

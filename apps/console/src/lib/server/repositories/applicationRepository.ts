@@ -13,6 +13,12 @@ export function listApplications(organizationId: string) {
 	});
 }
 
+/** The ids of an organization's applications (the menu's « Mon application » link). */
+export async function listApplicationIds(organizationId: string) {
+	const rows = await prisma.application.findMany({ where: { organizationId }, orderBy: { name: 'asc' }, select: { id: true } });
+	return rows.map((r) => r.id);
+}
+
 export function findApplication(organizationId: string, id: string) {
 	return prisma.application.findFirst({
 		where: { id, organizationId },

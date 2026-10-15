@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { LogOut, Menu, Network } from '@lucide/svelte';
 	import { Button, Modal, Sidebar, StandardLayout, ThemeToggle } from '@guillaumeg/ui';
-	import { isNavItemActive, NAV, type NavContext } from '$lib/records/navigation';
+	import { isNavItemActive, NAV, resolveNavItem, type NavContext } from '$lib/records/navigation';
 	import { labelForRole } from '$lib/records/roles';
 	import { authClient } from '$lib/auth-client';
 
@@ -26,12 +26,12 @@
 	const groups = $derived(
 		NAV.filter((section) => section.visible?.(nav) ?? true).map((section) => ({
 			label: section.label,
-			items: section.items.filter((item) => item.visible?.(nav) ?? true).map((item) => ({
-				label: item.label,
-				href: item.href,
-				icon: item.icon,
-				active: isNavItemActive(item, page.url.pathname)
-			}))
+			items: section.items
+				.filter((item) => item.visible?.(nav) ?? true)
+				.map((item) => {
+					const { label, href } = resolveNavItem(item, nav);
+					return { label, href, icon: item.icon, active: isNavItemActive({ href, match: item.match }, page.url.pathname) };
+				})
 		}))
 	);
 
