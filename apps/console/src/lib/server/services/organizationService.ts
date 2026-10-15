@@ -3,9 +3,10 @@ import * as orgRepo from '$lib/server/repositories/organizationRepository';
 import * as membershipRepo from '$lib/server/repositories/membershipRepository';
 import * as sessionRepo from '$lib/server/repositories/sessionRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
+import * as userRepo from '$lib/server/repositories/userRepository';
 import { purgeObjects } from '$lib/server/storage/purge';
 import { toActiveOrganization, toOrganizationListItem } from '$lib/server/mappers/organizationMapper';
-import { ensureAccount } from './accountService';
+import { ensureAccount, sendInvitation } from './accountService';
 import { forbidden, notFound } from '$lib/server/errors';
 import { slugify } from '$lib/utils/slug';
 import type { OrgRole } from '$lib/records/organization';
@@ -48,24 +49,36 @@ async function freeSlug(name: string): Promise<string> {
 	return slug;
 }
 
-/** Create an organization and its first owner (account created if needed) — superadmin only. */
+/** Create an organization and its first owner — superadmin only. A new owner account is invited by
+ *  e-mail; if the e-mail cannot be sent, nothing is kept (organization and account removed). */
 export async function createOrganization(
 	actor: Actor,
 	input: { name: string; quotaBytes: number; storageEnabled: boolean; ownerName: string; ownerEmail: string }
 ): Promise<CreatedOrganization> {
 	if (!actor.isSuperadmin) throw forbidden();
 	const slug = await freeSlug(input.name);
-	return prisma.$transaction(async (tx) => {
+	const ownerEmail = input.ownerEmail.trim().toLowerCase();
+	const { org, owner } = await prisma.$transaction(async (tx) => {
 		const org = await orgRepo.createOrganization(tx, {
 			name: input.name,
 			slug,
 			quotaBytes: BigInt(input.quotaBytes),
 			storageEnabled: input.storageEnabled
 		});
-		const owner = await ensureAccount({ name: input.ownerName, email: input.ownerEmail }, tx);
+		const owner = await ensureAccount({ name: input.ownerName, email: ownerEmail }, tx);
 		await membershipRepo.createMembership({ organizationId: org.id, userId: owner.userId, role: 'OWNER' }, tx);
-		return { name: org.name, ownerEmail: input.ownerEmail, temporaryPassword: owner.temporaryPassword };
+		return { org, owner };
 	});
+	if (owner.created) {
+		try {
+			await sendInvitation({ userId: owner.userId, name: input.ownerName.trim(), email: ownerEmail }, org.name);
+		} catch (err) {
+			await orgRepo.deleteOrganization(org.id);
+			await userRepo.deleteUser(owner.userId);
+			throw err;
+		}
+	}
+	return { name: org.name, ownerEmail, invited: owner.created };
 }
 
 export async function updateOrganization(

@@ -32,7 +32,6 @@ export function createUserWithPassword(
 	});
 }
 
-/** Delete an account (its sessions, credential and memberships cascade). */
 /** How many reset links (Better Auth `verification` rows) were created for the user since `since`. */
 export function countResetLinksSince(userId: string, since: Date) {
 	return prisma.verification.count({
@@ -56,7 +55,10 @@ export async function findUserDisabledAt(id: string) {
 }
 
 export function findUserAccount(id: string) {
-	return prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true, role: true, disabledAt: true } });
+	return prisma.user.findUnique({
+		where: { id },
+		select: { id: true, name: true, email: true, role: true, disabledAt: true, emailVerified: true }
+	});
 }
 
 /** Name and e-mail (the e-mail is the sign-in identifier; a taken one throws P2002). */
@@ -86,6 +88,24 @@ export function resetTwoFactor(userId: string) {
 	]);
 }
 
+/** Replace the account's pending links with a new one. Better Auth's reset endpoint accepts any
+ *  `reset-password:<token>` row: an invitation is a reset link that lasts longer (§30). */
+export function createInvitationLink(userId: string, token: string, expiresAt: Date) {
+	return prisma.$transaction([
+		prisma.verification.deleteMany({ where: { value: userId, identifier: { startsWith: 'reset-password:' } } }),
+		prisma.verification.create({
+			data: { id: randomUUID(), identifier: `reset-password:${token}`, value: userId, expiresAt },
+			select: { id: true }
+		})
+	]);
+}
+
+/** The person proved they own the address (they used an e-mailed link): no longer « invited ». */
+export function markEmailVerified(userId: string) {
+	return prisma.user.update({ where: { id: userId }, data: { emailVerified: true }, select: { id: true } });
+}
+
+/** Delete an account (its sessions, credential and memberships cascade). */
 export function deleteUser(id: string, tx: Prisma.TransactionClient = prisma) {
 	return tx.user.delete({ where: { id }, select: { id: true } });
 }

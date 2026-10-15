@@ -10,7 +10,8 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	// The token is in the URL: never send it to another site, never cache the page.
 	setHeaders({ 'referrer-policy': 'same-origin', 'cache-control': 'no-store' });
 	const token = url.searchParams.get('token') ?? '';
-	return { token, valid: await accountService.resetLinkIsValid(token) };
+	// `invitation=1`: the link comes from an invitation (same mechanism, other wording).
+	return { token, invitation: url.searchParams.has('invitation'), valid: await accountService.resetLinkIsValid(token) };
 };
 
 export const actions: Actions = {

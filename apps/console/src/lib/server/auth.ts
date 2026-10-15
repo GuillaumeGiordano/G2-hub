@@ -8,7 +8,7 @@ import { prisma } from './db';
 import { hubName, hubUrl } from './instance';
 import { sendMail } from './mail/mailer';
 import { consolePasswordResetMail } from './mail/templates';
-import { countResetLinksSince, findUserDisabledAt } from './repositories/userRepository';
+import { countResetLinksSince, findUserDisabledAt, markEmailVerified } from './repositories/userRepository';
 
 /** At most one reset e-mail per account in this window (the login page can be submitted by anyone). */
 const RESET_THROTTLE_MS = 2 * 60_000;
@@ -46,6 +46,10 @@ export const auth = betterAuth({
 		// console's own page (/login/nouveau-mot-de-passe), which sets the password with it.
 		resetPasswordTokenExpiresIn: CONSOLE_PASSWORD_RESET_VALID_MINUTES * 60,
 		revokeSessionsOnPasswordReset: true,
+		// An invitation is a reset link (§30): using one proves the address and ends « invited ».
+		onPasswordReset: async ({ user }) => {
+			await markEmailVerified(user.id);
+		},
 		sendResetPassword: async ({ user, token }) => {
 			if (await findUserDisabledAt(user.id)) return; // a disabled account gets no link (§30)
 			if ((await countResetLinksSince(user.id, new Date(Date.now() - RESET_THROTTLE_MS))) > 1) return;

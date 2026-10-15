@@ -45,6 +45,8 @@ export function listMembers(organizationId: string, search?: string) {
 					email: true,
 					role: true,
 					twoFactorEnabled: true,
+					// false until the person used their invitation (or a reset) link (§30).
+					emailVerified: true,
 					disabledAt: true,
 					// In how many organizations: more than one = a shared account (§30).
 					_count: { select: { memberships: true } },

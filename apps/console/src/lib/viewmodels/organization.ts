@@ -28,10 +28,10 @@ export type ActiveOrganization = {
 	role: OrgRole | null;
 };
 
-/** Result of creating an organization: the owner's one-time password when an account was created. */
+/** Result of creating an organization. */
 export type CreatedOrganization = {
 	name: string;
 	ownerEmail: string;
-	/** Shown ONCE to be handed over; null when the owner already had an account. */
-	temporaryPassword: string | null;
+	/** A new owner account: an invitation e-mail was sent (false = it already had an account). */
+	invited: boolean;
 };

@@ -58,6 +58,9 @@ export const actions: Actions = {
 		}
 	},
 
+	resend: ({ request, locals }) =>
+		memberAction(request, 'resent', (id) => memberService.resendMemberInvitation(locals.orgContext!, id)),
+
 	reset: ({ request, locals }) =>
 		memberAction(request, 'reset', (id) => memberService.sendMemberPasswordReset(locals.orgContext!, id)),
 

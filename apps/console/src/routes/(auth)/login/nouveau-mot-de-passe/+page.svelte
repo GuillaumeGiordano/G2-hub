@@ -8,17 +8,19 @@
 	import { toastEnhance } from '$lib/utils/toastEnhance';
 	import type { ActionData, PageData } from './$types';
 
-	// A console account chooses a new password from its e-mailed link. After success the link is used
-	// up and every session of the account is closed: the person signs in again.
+	// A console account chooses a new password from its e-mailed link: an invitation (a new account)
+	// or a reset. After success the link is used up and every session of the account is closed: the
+	// person signs in (and sets up two-factor authentication the first time).
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let busy = $state(false);
 	const fields = new FieldErrors(['password', 'confirm'], consolePasswordResetSchema);
 	const done = $derived(!!form && 'done' in form && form.done);
+	const heading = $derived(data.invitation ? 'Activer votre compte' : 'Nouveau mot de passe');
 </script>
 
 <svelte:head>
-	<title>Nouveau mot de passe — {page.data.hubName}</title>
+	<title>{heading} — {page.data.hubName}</title>
 </svelte:head>
 
 <div class="auth-screen">
@@ -27,20 +29,26 @@
 			<span class="auth-logo"><KeyRound size={22} /></span>
 			<div>
 				<div class="auth-title">{page.data.hubName}</div>
-				<div class="auth-sub">Nouveau mot de passe</div>
+				<div class="auth-sub">{heading}</div>
 			</div>
 		</div>
 
 		{#if done}
 			<Alert variant="success" title="Mot de passe enregistré">
-				Vous pouvez vous connecter avec votre nouveau mot de passe.
+				{data.invitation
+					? 'Votre compte est prêt. Connectez-vous : la double authentification vous sera demandée.'
+					: 'Vous pouvez vous connecter avec votre nouveau mot de passe.'}
 			</Alert>
 			<Button href="/login" addClass="w-full" size="lg">Se connecter</Button>
 		{:else if !data.valid}
 			<Alert variant="error" title="Lien invalide ou expiré">
-				Ce lien a déjà servi ou n'est plus valable. Demandez-en un nouveau.
+				{data.invitation
+					? "Ce lien a déjà servi ou n'est plus valable. Demandez à un admin de votre organisation de vous renvoyer l'invitation."
+					: "Ce lien a déjà servi ou n'est plus valable. Demandez-en un nouveau."}
 			</Alert>
-			<Button href="/login/mot-de-passe-oublie" addClass="w-full" size="lg" variant="secondary">Demander un nouveau lien</Button>
+			{#if !data.invitation}
+				<Button href="/login/mot-de-passe-oublie" addClass="w-full" size="lg" variant="secondary">Demander un nouveau lien</Button>
+			{/if}
 		{:else}
 			<form
 				method="POST"

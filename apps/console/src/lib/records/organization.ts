@@ -10,6 +10,9 @@ export const orgRoleLabel: Record<OrgRole, string> = {
 	OWNER: 'Admin'
 };
 
+/** The operator of the instance (G2 WebDev): sees and manages every organization. */
+export const SUPERADMIN_LABEL = 'Superadmin';
+
 /** What a member may do in its organization (DECISIONS.md §3, §26). The superadmin may do everything.
  *  `appUsers.manage`: invite / disable / delete the users of the applications' portals (§24). */
 export type OrgPermission = 'members.manage' | 'applications.manage' | 'appUsers.manage' | 'files.write' | 'read';

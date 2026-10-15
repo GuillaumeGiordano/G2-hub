@@ -19,7 +19,6 @@
 	} from '@guillaumeg/ui';
 	import { EllipsisVertical, LogIn, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
-	import TemporaryPassword from '$lib/components/TemporaryPassword.svelte';
 	import { PER_PAGE_OPTIONS } from '$lib/constants';
 	import {
 		DEFAULT_QUOTA_BYTES,
@@ -45,7 +44,6 @@
 
 	const FORM_MODAL_ID = 'organization-form';
 	const DELETE_MODAL_ID = 'organization-delete';
-	const PASSWORD_MODAL_ID = 'organization-owner-password';
 
 	let busy = $state(false);
 	const setBusy = (v: boolean) => (busy = v);
@@ -61,7 +59,6 @@
 	);
 
 	let toDelete = $state<OrganizationListItem | null>(null);
-	let created = $state<CreatedOrganization | null>(null);
 
 	// « Ouvrir » submits one hidden form with the chosen id.
 	let openForm: HTMLFormElement | undefined = $state();
@@ -113,15 +110,13 @@
 		openForm?.requestSubmit();
 	}
 
-	/** After a creation: show the owner's one-time password, if an account was created. */
-	async function onSaved(d: Record<string, unknown>) {
-		modal(FORM_MODAL_ID)?.close();
+	/** After a creation: say where the owner's invitation went (a new account gets one). */
+	function savedMessage(d: Record<string, unknown>): string {
 		const result = d.created as CreatedOrganization | undefined;
-		if (result?.temporaryPassword) {
-			created = result;
-			await tick();
-			modal(PASSWORD_MODAL_ID)?.showModal();
-		}
+		if (!result) return 'Organisation enregistrée.';
+		return result.invited
+			? `Organisation créée : invitation envoyée à ${result.ownerEmail}.`
+			: `Organisation créée : ${result.ownerEmail} y a accès avec son compte.`;
 	}
 </script>
 
@@ -249,8 +244,8 @@
 		oninput={formErrors.oninput}
 		onfocusout={formErrors.onfocusout}
 		use:enhance={toastEnhance({
-			success: () => (editing ? 'Organisation mise à jour.' : 'Organisation créée.'),
-			onSuccess: onSaved,
+			success: (d) => (editing ? 'Organisation mise à jour.' : savedMessage(d)),
+			onSuccess: () => modal(FORM_MODAL_ID)?.close(),
 			setBusy,
 			fields: formErrors
 		})}
@@ -282,7 +277,7 @@
 				name="ownerEmail"
 				type="email"
 				required
-				hint="S'il n'a pas encore de compte, un mot de passe temporaire est généré."
+				hint="S'il n'a pas encore de compte, il reçoit un e-mail pour choisir son mot de passe."
 			/>
 		{/if}
 
@@ -323,10 +318,6 @@
 		<Button type="submit" variant="danger" icon={Trash2} loading={busy}>Supprimer définitivement</Button>
 	</form>
 </Modal>
-
-{#if created?.temporaryPassword}
-	<TemporaryPassword id={PASSWORD_MODAL_ID} email={created.ownerEmail} password={created.temporaryPassword} />
-{/if}
 
 <style>
 	.usage {

@@ -18,18 +18,20 @@
 		LogOut,
 		Pencil,
 		Plus,
+		Send,
 		ShieldOff,
 		UserCheck,
 		UserMinus,
 		UserX
 	} from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
-	import TemporaryPassword from '$lib/components/TemporaryPassword.svelte';
+	import { CONSOLE_INVITATION_VALID_DAYS } from '$lib/constants';
+	import { orgRoleLabel, SUPERADMIN_LABEL } from '$lib/records/organization';
 	import { memberAddSchema, memberUpdateSchema } from '$lib/schemas/member';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { timeAgo } from '$lib/utils/timeAgo';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
-	import type { AddedMember, MemberListItem } from '$lib/viewmodels/member';
+	import type { MemberListItem } from '$lib/viewmodels/member';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -41,18 +43,17 @@
 	const EDIT_MODAL_ID = 'member-edit';
 	const REMOVE_MODAL_ID = 'member-remove';
 	const TWO_FACTOR_MODAL_ID = 'member-two-factor';
-	const PASSWORD_MODAL_ID = 'member-password';
 
 	let busy = $state(false);
 	const setBusy = (v: boolean) => (busy = v);
 
 	const addErrors = new FieldErrors(['name', 'email'], memberAddSchema);
 	const editErrors = new FieldErrors(['name', 'email'], memberUpdateSchema);
-	let added = $state<AddedMember | null>(null);
 
 	let target = $state<MemberListItem | null>(null);
 
-	// The one-click actions (reset, revoke, disable) submit one hidden form each.
+	// The one-click actions (resend, reset, revoke, disable) submit one hidden form each.
+	let resendForm: HTMLFormElement | undefined = $state();
 	let resetForm: HTMLFormElement | undefined = $state();
 	let revokeForm: HTMLFormElement | undefined = $state();
 	let disableForm: HTMLFormElement | undefined = $state();
@@ -81,16 +82,6 @@
 		form?.requestSubmit();
 	}
 
-	/** After an addition: show the new account's one-time password, if one was created. */
-	async function onAdded(d: Record<string, unknown>) {
-		modal(ADD_MODAL_ID)?.close();
-		const result = d.added as AddedMember | undefined;
-		if (result?.temporaryPassword) {
-			added = result;
-			await tick();
-			modal(PASSWORD_MODAL_ID)?.showModal();
-		}
-	}
 </script>
 
 {#snippet nameCell(member: MemberListItem)}
@@ -98,9 +89,18 @@
 		<span class="strong">{member.name}</span>
 		{#if member.isMe}<Badge label="Vous" variant="info" />{/if}
 		{#if member.shared}<Badge label="Compte partagé" variant="default" />{/if}
+		{#if member.invited}<Badge label="Invité" variant="warning" />{/if}
 		{#if member.disabled}<Badge label="Désactivé" variant="danger" />{/if}
 	</div>
 	<div class="email">{member.email}</div>
+{/snippet}
+
+{#snippet roleCell(member: MemberListItem)}
+	{#if member.isSuperadmin}
+		<Badge label={SUPERADMIN_LABEL} variant="primary" />
+	{:else}
+		<Badge label={orgRoleLabel[member.role]} variant="info" />
+	{/if}
 {/snippet}
 
 {#snippet twoFactorCell(member: MemberListItem)}
@@ -136,7 +136,17 @@
 							close();
 						}}
 					/>
-					{#if !member.disabled}
+					{#if member.invited && !member.disabled}
+						<ButtonActionItem
+							label="Renvoyer l'invitation"
+							icon={Send}
+							onclick={() => {
+								submitFor(member, resendForm);
+								close();
+							}}
+						/>
+					{/if}
+					{#if !member.disabled && !member.invited}
 						<ButtonActionItem
 							label="Réinitialiser le mot de passe"
 							icon={KeyRound}
@@ -217,6 +227,7 @@
 		emptyLabel={data.searching ? 'Aucun membre trouvé.' : 'Aucun membre.'}
 		columns={[
 			{ key: 'name', label: 'Membre', cell: nameCell },
+			{ key: 'role', label: 'Rôle', cell: roleCell },
 			{ key: 'twoFactorEnabled', label: 'Double authentification', cell: twoFactorCell },
 			{ key: 'lastActiveAt', label: 'Activité', cell: activityCell },
 			{ key: 'membershipId', label: '', align: 'right', cell: actionsCell }
@@ -227,6 +238,16 @@
 		changements s'appliqueraient aussi là-bas.
 	</p>
 </div>
+
+<form
+	bind:this={resendForm}
+	method="POST"
+	action="?/resend"
+	hidden
+	use:enhance={toastEnhance({ success: (d) => `Invitation renvoyée à ${d.resent}.`, setBusy })}
+>
+	<input type="hidden" name="membershipId" value={target?.membershipId} />
+</form>
 
 <form
 	bind:this={resetForm}
@@ -268,8 +289,13 @@
 		oninput={addErrors.oninput}
 		onfocusout={addErrors.onfocusout}
 		use:enhance={toastEnhance({
-			success: 'Membre ajouté.',
-			onSuccess: onAdded,
+			success: (d) => {
+				const added = d.added as { email: string; invited: boolean };
+				return added.invited
+					? `Invitation envoyée à ${added.email}.`
+					: `${added.email} avait déjà un compte : il a accès à l'organisation.`;
+			},
+			onSuccess: () => modal(ADD_MODAL_ID)?.close(),
 			resetOnSuccess: true,
 			setBusy,
 			fields: addErrors
@@ -282,7 +308,7 @@
 			name="email"
 			type="email"
 			required
-			hint="S'il n'a pas encore de compte, un mot de passe temporaire est généré."
+			hint={`S'il n'a pas encore de compte, il reçoit un e-mail pour choisir son mot de passe (lien valable ${CONSOLE_INVITATION_VALID_DAYS} jours).`}
 		/>
 		<p class="hint">
 			Il devient admin de l'organisation et devra activer la double authentification à sa première
@@ -371,10 +397,6 @@
 		<Button type="submit" variant="danger" icon={UserMinus} loading={busy}>Retirer</Button>
 	</form>
 </Modal>
-
-{#if added?.temporaryPassword}
-	<TemporaryPassword id={PASSWORD_MODAL_ID} email={added.email} password={added.temporaryPassword} />
-{/if}
 
 <style>
 	.name {

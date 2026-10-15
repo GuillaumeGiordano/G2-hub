@@ -5,7 +5,7 @@ import * as userRepo from '$lib/server/repositories/userRepository';
 import { canEditAccount, toMemberListItem } from '$lib/server/mappers/memberMapper';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { HubError, notFound } from '$lib/server/errors';
-import { ensureAccount, requestPasswordReset } from './accountService';
+import { ensureAccount, requestPasswordReset, sendInvitation } from './accountService';
 import type { OrgRole } from '$lib/records/organization';
 import type { AddedMember, MemberListItem } from '$lib/viewmodels/member';
 
@@ -68,6 +68,7 @@ export async function updateMember(
 export async function sendMemberPasswordReset(ctx: OrgContext, membershipId: string): Promise<string> {
 	const member = await editableMember(ctx, membershipId);
 	if (member.account.disabledAt) throw new HubError("Ce compte est désactivé : réactivez-le d'abord.");
+	if (!member.account.emailVerified) throw new HubError("Pas encore de mot de passe : utilisez « Renvoyer l'invitation ».");
 	if ((await userRepo.countResetLinksSince(member.userId, new Date(Date.now() - RESET_THROTTLE_MS))) > 0) {
 		throw new HubError('Un lien vient déjà de lui être envoyé : réessayez dans 2 minutes.');
 	}
@@ -108,21 +109,41 @@ export async function resetMemberTwoFactor(ctx: OrgContext, membershipId: string
 	return member.account.email;
 }
 
-/** Add someone to the organization; an account is created (temporary password) if needed. */
+/** Add someone to the organization. A new account is invited by e-mail; if the e-mail cannot be
+ *  sent, the account is removed again (an invitation nobody received helps no one). */
 export async function addMember(
 	ctx: OrgContext,
 	input: { name: string; email: string }
 ): Promise<AddedMember> {
 	assertCan(ctx, 'members.manage');
 	const organizationId = ctx.organization.id;
-	return prisma.$transaction(async (tx) => {
-		const account = await ensureAccount({ name: input.name, email: input.email }, tx);
-		if (await membershipRepo.findMembership(organizationId, account.userId)) {
+	const email = input.email.trim().toLowerCase();
+	const account = await prisma.$transaction(async (tx) => {
+		const found = await ensureAccount({ name: input.name, email }, tx);
+		if (await membershipRepo.findMembership(organizationId, found.userId)) {
 			throw new HubError('Cette personne est déjà membre de l’organisation.', { field: 'email' });
 		}
-		await membershipRepo.createMembership({ organizationId, userId: account.userId, role: 'OWNER' }, tx);
-		return { email: input.email, temporaryPassword: account.temporaryPassword };
+		await membershipRepo.createMembership({ organizationId, userId: found.userId, role: 'OWNER' }, tx);
+		return found;
 	});
+	if (account.created) {
+		try {
+			await sendInvitation({ userId: account.userId, name: input.name.trim(), email }, ctx.organization.name);
+		} catch (err) {
+			await userRepo.deleteUser(account.userId);
+			throw err;
+		}
+	}
+	return { email, invited: account.created };
+}
+
+/** A new invitation link for a member who has not chosen a password yet. */
+export async function resendMemberInvitation(ctx: OrgContext, membershipId: string): Promise<string> {
+	const member = await editableMember(ctx, membershipId);
+	if (member.account.emailVerified) throw new HubError('Ce compte est déjà activé.');
+	if (member.account.disabledAt) throw new HubError("Ce compte est désactivé : réactivez-le d'abord.");
+	await sendInvitation({ userId: member.userId, name: member.account.name, email: member.account.email }, ctx.organization.name);
+	return member.account.email;
 }
 
 /** Refuse to leave the organization without an Admin. */

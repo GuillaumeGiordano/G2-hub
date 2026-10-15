@@ -61,3 +61,24 @@ export function consolePasswordResetMail(c: { to: string; name: string; hubName:
 		html: layout([intro, body], { label: 'Choisir un nouveau mot de passe', url: c.link }, footer)
 	};
 }
+
+/** A new console account: choose a password to join the organization (added by an Admin or by the
+ *  superadmin when creating the organization). */
+export function consoleInvitationMail(c: {
+	to: string;
+	name: string;
+	hubName: string;
+	organizationName: string;
+	link: string;
+	validDays: number;
+}): Mail {
+	const intro = `Bonjour ${c.name},`;
+	const body = `Vous êtes invité(e) à gérer « ${c.organizationName} » dans la console ${c.hubName}. Choisissez votre mot de passe pour activer votre compte ; la double authentification vous sera ensuite demandée.`;
+	const footer = `Ce lien est valable ${c.validDays} jours et ne sert qu'une fois. Si vous n'attendiez pas cette invitation, ignorez cet e-mail.`;
+	return {
+		to: c.to,
+		subject: `Invitation à rejoindre ${c.organizationName} — ${c.hubName}`,
+		text: `${intro}\n\n${body}\n\n${c.link}\n\n${footer}\n`,
+		html: layout([intro, body], { label: 'Activer mon compte', url: c.link }, footer)
+	};
+}

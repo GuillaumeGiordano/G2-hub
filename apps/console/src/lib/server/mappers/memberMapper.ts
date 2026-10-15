@@ -10,6 +10,7 @@ type MemberRow = {
 		email: string;
 		role: string;
 		twoFactorEnabled: boolean;
+		emailVerified: boolean;
 		disabledAt: Date | null;
 		_count: { memberships: number };
 		sessions: { updatedAt: Date; expiresAt: Date }[];
@@ -41,6 +42,8 @@ export function toMemberListItem(
 		twoFactorEnabled: row.user.twoFactorEnabled,
 		isMe: row.user.id === viewer.userId,
 		disabled: row.user.disabledAt !== null,
+		isSuperadmin: row.user.role === 'superadmin',
+		invited: !row.user.emailVerified,
 		shared,
 		editable: canEditAccount({ role: row.user.role, memberships: row.user._count.memberships }, viewer),
 		signedIn: !!last && last.expiresAt > now,
