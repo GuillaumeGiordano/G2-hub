@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Alert, Badge, Button, Card } from '@guillaumeg/ui';
-	import { LogIn, LogOut, Settings, UserRound, Wheat } from '@lucide/svelte';
+	import { Images, LogIn, LogOut, Settings, UserRound, Wheat } from '@lucide/svelte';
 	import { portalRoleLabel } from '$lib/roles';
 	import type { PageData } from './$types';
 
@@ -62,6 +62,9 @@
 					Ici, le back-office du site : produits, articles, galerie… Les médias sont stockés dans
 					G2 Hub, les utilisateurs du portail se gèrent dans la console.
 				</p>
+				<div class="actions admin-actions">
+					<Button href="/admin/galerie" variant="secondary" icon={Images}>Gérer la galerie</Button>
+				</div>
 			</Card>
 		{/if}
 	{:else}
@@ -147,6 +150,9 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
+	}
+	.admin-actions {
+		margin-top: 16px;
 	}
 	.signin {
 		display: flex;

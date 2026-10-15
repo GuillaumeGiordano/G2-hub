@@ -16,3 +16,8 @@ export function hub(): HubClient | null {
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The site's gallery (the folder the landing page shows) — managed by the admins on /admin/galerie. */
+export const galleryPath = () => env.DEMO_GALLERY_PATH || 'Galerie';
+export const GALLERY_MAX_BYTES = 10 * 1024 * 1024;
+export const GALLERY_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
