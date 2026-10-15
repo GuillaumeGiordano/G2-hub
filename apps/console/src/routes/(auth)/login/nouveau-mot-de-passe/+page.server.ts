@@ -5,7 +5,7 @@ import { actionFailure } from '$lib/server/http';
 import * as accountService from '$lib/server/services/accountService';
 import type { Actions, PageServerLoad } from './$types';
 
-// A console account chooses a new password from its e-mailed link (`?token=`, DECISIONS.md §31).
+// A console account chooses a new password from its e-mailed link (`?token=`, DECISIONS.md §30).
 export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	// The token is in the URL: never send it to another site, never cache the page.
 	setHeaders({ 'referrer-policy': 'same-origin', 'cache-control': 'no-store' });

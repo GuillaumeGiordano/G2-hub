@@ -21,7 +21,11 @@
 		const { data: result, error } = await authClient.signIn.email({ email, password });
 		loading = false;
 		if (error) {
-			formError = 'Email ou mot de passe incorrect.';
+			// 403 only comes after a correct password (auth.ts refuses the session of a disabled account).
+			formError =
+				error.status === 403
+					? 'Ce compte est désactivé : contactez un admin de votre organisation.'
+					: 'Email ou mot de passe incorrect.';
 			return;
 		}
 		// With 2FA enabled, the twoFactorClient redirects to /2fa (see auth-client.ts).

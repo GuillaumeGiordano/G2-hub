@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { twoFactor } from 'better-auth/plugins';
 import { env } from '$env/dynamic/private';
@@ -7,14 +8,14 @@ import { prisma } from './db';
 import { hubName, hubUrl } from './instance';
 import { sendMail } from './mail/mailer';
 import { consolePasswordResetMail } from './mail/templates';
-import { countResetLinksSince } from './repositories/userRepository';
+import { countResetLinksSince, findUserDisabledAt } from './repositories/userRepository';
 
 /** At most one reset e-mail per account in this window (the login page can be submitted by anyone). */
 const RESET_THROTTLE_MS = 2 * 60_000;
 
 // Console accounts. No public sign-up: the first superadmin comes from `pnpm hub:install`, the
 // others are invited from the console (step 1). No email verification. A forgotten password is reset
-// from an e-mailed link (§31). (Application users — portal end users — are NOT Better Auth accounts:
+// from an e-mailed link (§30). (Application users — portal end users — are NOT Better Auth accounts:
 // see appUserService.)
 export const auth = betterAuth({
 	baseURL: hubUrl() || undefined,
@@ -46,6 +47,7 @@ export const auth = betterAuth({
 		resetPasswordTokenExpiresIn: CONSOLE_PASSWORD_RESET_VALID_MINUTES * 60,
 		revokeSessionsOnPasswordReset: true,
 		sendResetPassword: async ({ user, token }) => {
+			if (await findUserDisabledAt(user.id)) return; // a disabled account gets no link (§30)
 			if ((await countResetLinksSince(user.id, new Date(Date.now() - RESET_THROTTLE_MS))) > 1) return;
 			await sendMail(
 				consolePasswordResetMail({
@@ -64,6 +66,19 @@ export const auth = betterAuth({
 		window: 60,
 		max: 100,
 		customRules: { '/sign-in/email': { window: 60, max: 5 } }
+	},
+
+	// A disabled account (§30) cannot open a session: sign-in (and its 2FA step) is refused.
+	databaseHooks: {
+		session: {
+			create: {
+				before: async (session) => {
+					if (await findUserDisabledAt(session.userId)) {
+						throw new APIError('FORBIDDEN', { message: 'ACCOUNT_DISABLED' });
+					}
+				}
+			}
+		}
 	},
 
 	// TOTP + backup codes. On sign-in with 2FA enabled, the client is redirected to /2fa.

@@ -5,7 +5,7 @@ import { actionFailure } from '$lib/server/http';
 import * as accountService from '$lib/server/services/accountService';
 import type { Actions } from './$types';
 
-// « Mot de passe oublié » of a CONSOLE account (DECISIONS.md §31). Same answer whether the address
+// « Mot de passe oublié » of a CONSOLE account (DECISIONS.md §30). Same answer whether the address
 // has an account or not.
 export const actions: Actions = {
 	default: async ({ request }) => {

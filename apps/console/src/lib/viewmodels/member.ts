@@ -9,6 +9,16 @@ export type MemberListItem = {
 	role: OrgRole;
 	twoFactorEnabled: boolean;
 	isMe: boolean;
+	/** Disabled: no sign-in possible, the account and its memberships are kept. */
+	disabled: boolean;
+	/** Also a member of another organization: only the superadmin may edit it (§30). */
+	shared: boolean;
+	/** May the viewer edit, disable, sign out or reset this account? */
+	editable: boolean;
+	/** Holds a console session that has not expired. */
+	signedIn: boolean;
+	/** Last activity of its most recent session. */
+	lastActiveAt: Date | null;
 };
 
 /** Result of adding a member: the one-time password when an account was created. */

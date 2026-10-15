@@ -290,6 +290,9 @@ model User {
   role             String   @default("member")
   /// Whether two-factor authentication is enabled (Better Auth twoFactor plugin).
   twoFactorEnabled Boolean  @default(false)
+  /// Set when an Admin (or the superadmin) disables the account: no new session, existing ones
+  /// revoked; the account and its memberships are kept (DECISIONS.md §30).
+  disabledAt       DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

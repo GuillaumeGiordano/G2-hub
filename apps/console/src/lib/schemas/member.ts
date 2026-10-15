@@ -8,3 +8,10 @@ export const memberAddSchema = z.object({
 	name: requiredString('Nom requis'),
 	email: email()
 });
+
+/** Edit a member's account (name and sign-in e-mail). */
+export const memberUpdateSchema = z.object({
+	membershipId: requiredString(),
+	name: requiredString('Nom requis').max(120, '120 caractères maximum'),
+	email: email()
+});

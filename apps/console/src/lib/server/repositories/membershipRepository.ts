@@ -21,14 +21,37 @@ export function findMembership(organizationId: string, userId: string) {
 	});
 }
 
-export function listMembers(organizationId: string) {
+export function listMembers(organizationId: string, search?: string) {
 	return prisma.membership.findMany({
-		where: { organizationId },
+		where: {
+			organizationId,
+			...(search && {
+				user: {
+					OR: [
+						{ name: { contains: search, mode: 'insensitive' } },
+						{ email: { contains: search, mode: 'insensitive' } }
+					]
+				}
+			})
+		},
 		orderBy: [{ role: 'asc' }, { user: { name: 'asc' } }],
 		select: {
 			id: true,
 			role: true,
-			user: { select: { id: true, name: true, email: true, twoFactorEnabled: true } }
+			user: {
+				select: {
+					id: true,
+					name: true,
+					email: true,
+					role: true,
+					twoFactorEnabled: true,
+					disabledAt: true,
+					// In how many organizations: more than one = a shared account (§30).
+					_count: { select: { memberships: true } },
+					// The most recently active session (Better Auth refreshes `updatedAt` while it is used).
+					sessions: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true, expiresAt: true } }
+				}
+			}
 		}
 	});
 }
@@ -42,6 +65,11 @@ export function findMemberInOrganization(organizationId: string, membershipId: s
 
 export function countOwners(organizationId: string) {
 	return prisma.membership.count({ where: { organizationId, role: 'OWNER' } });
+}
+
+/** Admins whose account is not disabled: an organization always keeps at least one. */
+export function countActiveOwners(organizationId: string) {
+	return prisma.membership.count({ where: { organizationId, role: 'OWNER', user: { disabledAt: null } } });
 }
 
 export function countMembershipsOfUser(userId: string, tx: Prisma.TransactionClient = prisma) {
