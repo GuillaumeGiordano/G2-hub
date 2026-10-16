@@ -2,7 +2,7 @@
 // and renders the @guillaumeg/ui <Sidebar> (desktop) and the mobile drawer. Add a link HERE only.
 import type { Component } from 'svelte';
 import { orgPath } from '$lib/utils/orgPath';
-import { AppWindow, Building, Building2, LayoutDashboard, ShieldCheck, Users } from '@lucide/svelte';
+import { AppWindow, Building, Building2, LayoutDashboard, LayoutGrid, ShieldCheck, Users } from '@lucide/svelte';
 
 /** What the current user can reach — decides which links show. */
 export type NavContext = {
@@ -69,6 +69,8 @@ export const NAV: NavSection[] = [
 		items: [
 			{ label: 'Mon organisation', href: (ctx) => orgPath(ctx.organizationId!, '/informations'), icon: Building },
 			{ label: applicationsLabel, href: applicationsHref, icon: AppWindow },
+			// The client portal and the tools of the platform enabled for this organization (§38).
+			{ label: 'Outils', href: (ctx) => orgPath(ctx.organizationId!, '/outils'), icon: LayoutGrid },
 			// Console accounts are the superadmin's (§32).
 		]
 	},
@@ -138,6 +140,7 @@ export function superadminOrganizationTabs(organizationId: string) {
 		{ label: 'Informations', href: orgPath(organizationId, '/informations') },
 		{ label: 'Membres', href: orgPath(organizationId, '/membres') },
 		{ label: 'Applications', href: orgPath(organizationId, '/applications') },
+		{ label: 'Outils', href: orgPath(organizationId, '/outils') },
 		{ label: 'Stockage', href: orgPath(organizationId) }
 	];
 }

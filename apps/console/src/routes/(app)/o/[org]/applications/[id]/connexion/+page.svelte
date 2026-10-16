@@ -3,12 +3,14 @@
 	import { orgPath } from '$lib/utils/orgPath';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { Alert, Badge, Breadcrumb, Button, Card, CopyButton, Modal, TagInput } from '@guillaumeg/ui';
+	import { Alert, Badge, Breadcrumb, Button, Card, CopyButton, Input, Modal, RadioGroup, TagInput } from '@guillaumeg/ui';
 	import { KeyRound, LogIn, Power, RefreshCw, Save } from '@lucide/svelte';
 	import PageTabs from '$lib/components/PageTabs.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { applicationTabs } from '$lib/records/navigation';
 	import { SSO_SCOPES } from '$lib/records/sso';
+	import { platformAccessOptions } from '$lib/records/platform';
+	import { platformSettingsSchema } from '$lib/schemas/platform';
 	import { ssoRedirectsSchema } from '$lib/schemas/sso';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
@@ -40,6 +42,11 @@
 	);
 
 	let secret = $state<string | null>(null);
+
+	// « Application de la plateforme » (superadmin, §38): edited locally, re-synced with the data.
+	let platformAccess = $derived<string>(data.platform?.platformAccess ?? 'NONE');
+	let homeUrl = $derived(data.platform?.homeUrl ?? '');
+	const platformErrors = new FieldErrors(['platformAccess', 'homeUrl'], platformSettingsSchema);
 
 	function modal(id: string) {
 		return document.getElementById(id) as HTMLDialogElement | null;
@@ -99,6 +106,40 @@
 			</div>
 		{/if}
 	</Card>
+
+	{#if data.platform}
+		<Card>
+			{#snippet header()}
+				<div class="card-title">Application de la plateforme</div>
+			{/snippet}
+			<form
+				method="POST"
+				action="?/platform"
+				class="form"
+				use:enhance={toastEnhance({ success: 'Réglage enregistré.', setBusy, fields: platformErrors })}
+			>
+				<RadioGroup
+					legend="Qui peut s'y connecter avec son compte console"
+					name="platformAccess"
+					bind:value={platformAccess}
+					options={platformAccessOptions}
+					error={platformErrors.get('platformAccess')}
+				/>
+				<Input
+					label="Adresse d'entrée"
+					name="homeUrl"
+					type="url"
+					bind:value={homeUrl}
+					placeholder="https://outil.g2webdev.fr"
+					hint="Ouverte par la page « Outils » de la console. Un outil reçoit en plus ?organization=<id>, à transmettre à la connexion."
+					error={platformErrors.get('homeUrl')}
+				/>
+				<div class="form-submit">
+					<Button type="submit" icon={Save} loading={busy}>Enregistrer</Button>
+				</div>
+			</form>
+		</Card>
+	{/if}
 
 	<Card>
 		{#snippet header()}
