@@ -5,7 +5,18 @@ import { randomBytes } from 'node:crypto';
 
 import type { PortalRole } from '$lib/roles';
 
-export type PortalUser = { sub: string; name: string; email: string; role: PortalRole; signedInAt: Date };
+type Organization = { id: string; name: string };
+
+export type PortalUser = {
+	sub: string;
+	name: string;
+	email: string;
+	role: PortalRole;
+	/** As a tool: the organization the user entered for. As the client portal: all of theirs (§38). */
+	organization: Organization | null;
+	organizations: Organization[] | null;
+	signedInAt: Date;
+};
 
 /** The hub's access token of the user: with the secret key, it opens THEIR personal space
  *  (DECISIONS.md §28). Server-side only — never sent to the browser. Valid one hour. */

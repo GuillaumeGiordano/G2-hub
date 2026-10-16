@@ -7,7 +7,8 @@ import { env } from '$env/dynamic/private';
 
 export const portalUrl = () => env.DEMO_PORTAL_URL || 'http://localhost:5191';
 export const redirectUri = () => `${portalUrl()}/auth/callback`;
-export const SCOPE = 'openid email profile';
+// `organization` / `organizations`: only answered for an application of the platform (§38).
+export const SCOPE = 'openid email profile organization organizations';
 
 /** Short-lived cookie holding state + nonce + PKCE verifier between /auth/login and /auth/callback. */
 export const AUTH_COOKIE = 'portal_auth';

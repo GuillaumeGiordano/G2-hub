@@ -35,6 +35,8 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			name: String(info.name ?? ''),
 			email: String(info.email ?? ''),
 			role: toPortalRole(claims.role),
+			organization: (claims.organization as { id: string; name: string } | undefined) ?? null,
+			organizations: (claims.organizations as { id: string; name: string }[] | undefined) ?? null,
 			signedInAt: new Date()
 		};
 		// Kept on the server: with the secret key it opens the user's personal space (§28).

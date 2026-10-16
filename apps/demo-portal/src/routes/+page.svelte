@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Alert, Badge, Button, Card } from '@guillaumeg/ui';
 	import { Images, LogIn, LogOut, Settings, UserRound, Wheat } from '@lucide/svelte';
 	import { portalRoleLabel } from '$lib/roles';
@@ -9,6 +10,10 @@
 	let { data }: { data: PageData } = $props();
 
 	const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
+
+	// Opened as a tool from the hub's « Outils » launcher: keep the organization for the sign-in.
+	const organization = $derived(page.url.searchParams.get('organization'));
+	const loginHref = $derived(organization ? `/auth/login?organization=${encodeURIComponent(organization)}` : '/auth/login');
 </script>
 
 <main class="portal">
@@ -37,6 +42,14 @@
 				<dd>{data.user.email}</dd>
 				<dt>Rôle</dt>
 				<dd><Badge label={portalRoleLabel[data.user.role]} variant={data.user.role === 'admin' ? 'primary' : 'info'} /></dd>
+				{#if data.user.organization}
+					<dt>Organisation</dt>
+					<dd>{data.user.organization.name}</dd>
+				{/if}
+				{#if data.user.organizations}
+					<dt>Organisations</dt>
+					<dd>{data.user.organizations.map((o) => o.name).join(', ') || '—'}</dd>
+				{/if}
 				<dt>Identifiant G2 Hub (sub)</dt>
 				<dd><code>{data.user.sub}</code></dd>
 				<dt>Connecté le</dt>
@@ -72,7 +85,7 @@
 			<div class="signin">
 				<p>Connectez-vous pour accéder à votre espace : vos commandes, vos documents, vos avantages.</p>
 				{#if data.configured}
-					<Button href="/auth/login" icon={LogIn} size="lg">Se connecter avec G2 Hub</Button>
+					<Button href={loginHref} icon={LogIn} size="lg">Se connecter avec G2 Hub</Button>
 				{:else}
 					<Alert variant="warning" title="Portail non configuré">
 						Renseignez DEMO_PORTAL_CLIENT_ID et DEMO_PORTAL_CLIENT_SECRET dans le .env (console G2 Hub ›

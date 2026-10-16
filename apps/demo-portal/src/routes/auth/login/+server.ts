@@ -9,7 +9,7 @@ import type { RequestHandler } from './$types';
 //   - state: the answer belongs to a sign-in started here (CSRF);
 //   - nonce: the ID token was issued for this sign-in (replay);
 //   - PKCE verifier: only this browser's sign-in can redeem the code (its hash goes to the hub).
-export const GET: RequestHandler = async ({ cookies }) => {
+export const GET: RequestHandler = async ({ cookies, url: here }) => {
 	const config = await hubConfig();
 	if (!config) error(503, 'Connexion G2 Hub non configurée (DEMO_PORTAL_CLIENT_ID / _SECRET).');
 
@@ -30,7 +30,10 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
 		code_challenge_method: 'S256',
 		state,
-		nonce
+		nonce,
+		// Opened from the hub's « Outils » launcher as a TOOL: the organization it is opened for,
+		// passed on to the hub, which checks it (G2 Hub DECISIONS.md §38).
+		...(here.searchParams.get('organization') && { organization: here.searchParams.get('organization')! })
 	});
 	redirect(303, url.href);
 };
