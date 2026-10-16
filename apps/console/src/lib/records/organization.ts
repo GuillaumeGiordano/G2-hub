@@ -97,28 +97,7 @@ export function offerLabel(storageEnabled: boolean): string {
 	return storageEnabled ? 'Accès + Stockage' : 'Accès';
 }
 
-// ─── Profile (« Mon organisation », DECISIONS.md §31) ─────────────────────────
-
-/** Legal forms offered in the profile (French companies first, then the rest). */
-export const LEGAL_FORMS = ['EI', 'MICRO', 'EURL', 'SARL', 'SASU', 'SAS', 'SA', 'SCI', 'SCOP', 'ASSOCIATION', 'PUBLIC', 'OTHER'] as const;
-export type LegalForm = (typeof LEGAL_FORMS)[number];
-
-export const legalFormLabel: Record<LegalForm, string> = {
-	EI: 'Entreprise individuelle (EI)',
-	MICRO: 'Micro-entreprise',
-	EURL: 'EURL',
-	SARL: 'SARL',
-	SASU: 'SASU',
-	SAS: 'SAS',
-	SA: 'SA',
-	SCI: 'SCI',
-	SCOP: 'SCOP',
-	ASSOCIATION: 'Association',
-	PUBLIC: 'Établissement public / collectivité',
-	OTHER: 'Autre'
-};
-
-export const legalFormOptions = LEGAL_FORMS.map((f) => ({ value: f, label: legalFormLabel[f] }));
+// ─── « Mon organisation » (DECISIONS.md §31) ───────────────────────────────────
 
 /** SUSPENDED is informative for now: nothing is blocked (§31). */
 export const ORGANIZATION_STATUSES = ['ACTIVE', 'SUSPENDED'] as const;

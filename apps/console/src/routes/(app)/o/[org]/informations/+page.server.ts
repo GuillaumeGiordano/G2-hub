@@ -1,14 +1,14 @@
 import { fail } from '@sveltejs/kit';
 import { parseForm } from '$lib/validation';
-import { organizationContractSchema, organizationProfileSchema } from '$lib/schemas/organizationProfile';
+import { organizationProfileSchema, organizationStatusSchema } from '$lib/schemas/organizationProfile';
 import { actionFailure, loadFailure } from '$lib/server/http';
 import * as organizationService from '$lib/server/services/organizationService';
 import type { Actions, PageServerLoad } from './$types';
 
-// « Mon organisation › Informations » (/o/<id>/informations) — the organization's profile, for its
-// members (DECISIONS.md §31). The hook guarantees `locals.orgContext` (the organization of the
-// address, access checked).
-// The profile is edited by its Admins, the contract by the superadmin (the service checks both).
+// « Mon organisation › Informations » (/o/<id>/informations) — the organization, for its members
+// (DECISIONS.md §31). The hook guarantees `locals.orgContext` (the organization of the address,
+// access checked). Its Admins edit the name and the logo, the superadmin the status (the service
+// checks both); the legal and billing profile lives in g2-erp.
 export const load: PageServerLoad = async ({ locals }) => {
 	try {
 		return { org: await organizationService.getMyOrganization(locals.orgContext!) };
@@ -28,11 +28,11 @@ export const actions: Actions = {
 		}
 	},
 
-	contract: async ({ request, locals }) => {
-		const parsed = parseForm(await request.formData(), organizationContractSchema);
+	status: async ({ request, locals }) => {
+		const parsed = parseForm(await request.formData(), organizationStatusSchema);
 		if (!parsed.success) return fail(400, { errors: parsed.errors });
 		try {
-			return { saved: await organizationService.updateOrganizationContract(locals.orgContext!, parsed.data) };
+			return { saved: await organizationService.updateOrganizationStatus(locals.orgContext!, parsed.data) };
 		} catch (err) {
 			return actionFailure(err);
 		}

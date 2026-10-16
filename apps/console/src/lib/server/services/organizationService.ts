@@ -6,12 +6,12 @@ import * as userRepo from '$lib/server/repositories/userRepository';
 import * as storage from '$lib/server/storage/s3';
 import { processLogo } from '$lib/server/storage/images';
 import { purgeObjects } from '$lib/server/storage/purge';
-import { toActiveOrganization, toOrganizationContract, toOrganizationListItem, toOrganizationProfile } from '$lib/server/mappers/organizationMapper';
+import { toActiveOrganization, toOrganizationListItem } from '$lib/server/mappers/organizationMapper';
 import { ensureAccount, sendInvitation } from './accountService';
 import { assertCan, type OrgContext } from '$lib/server/context';
 import { forbidden, HubError, notFound } from '$lib/server/errors';
 import { can, LOGO_MAX_BYTES, LOGO_TYPES } from '$lib/records/organization';
-import type { OrganizationContractInput, OrganizationProfileInput } from '$lib/schemas/organizationProfile';
+import type { OrganizationProfileInput, OrganizationStatusInput } from '$lib/schemas/organizationProfile';
 import { slugify } from '$lib/utils/slug';
 import type { OrgRole } from '$lib/records/organization';
 import type {
@@ -151,35 +151,21 @@ export async function getMyOrganization(ctx: OrgContext): Promise<MyOrganization
 		canEdit: can(org.role, ctx.isSuperadmin, 'organization.manage'),
 		isSuperadmin: ctx.isSuperadmin,
 		logoUrl: profile.logoKey ? storage.publicUrl(profile.logoKey) : null,
-		profile: toOrganizationProfile(profile),
-		contract: toOrganizationContract(profile, ctx.isSuperadmin)
+		status: profile.status
 	};
 }
 
-/** Empty → null: an optional field cleared in the form is cleared in the database. */
-const orNull = <T>(v: T | undefined) => (v === undefined ? null : v);
-
-/** The profile, edited by the organization's Admins (and the superadmin). */
+/** The name, edited by the organization's Admins (and the superadmin). */
 export async function updateOrganizationProfile(ctx: OrgContext, input: OrganizationProfileInput): Promise<string> {
 	assertCan(ctx, 'organization.manage');
-	const { name, billingSameAddress, ...rest } = input;
-	const data = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, orNull(v)]));
-	// « Same as the head office »: the billing address fields are not kept.
-	if (billingSameAddress) {
-		for (const k of ['billingAddressLine1', 'billingAddressLine2', 'billingPostalCode', 'billingCity', 'billingCountry']) data[k] = null;
-	}
-	const org = await orgRepo.updateOrganizationProfile(ctx.organization.id, { ...data, name, billingSameAddress });
+	const org = await orgRepo.updateOrganizationName(ctx.organization.id, input.name);
 	return org.name;
 }
 
-/** The contract (status, start date, internal notes): the superadmin's. */
-export async function updateOrganizationContract(ctx: OrgContext, input: OrganizationContractInput): Promise<string> {
+/** The status: the superadmin's (later g2-erp's, from the active contract). */
+export async function updateOrganizationStatus(ctx: OrgContext, input: OrganizationStatusInput): Promise<string> {
 	if (!ctx.isSuperadmin) throw forbidden();
-	const org = await orgRepo.updateOrganizationInternal(ctx.organization.id, {
-		status: input.status,
-		contractStartedAt: input.contractStartedAt ? new Date(`${input.contractStartedAt}T00:00:00Z`) : null,
-		internalNotes: orNull(input.internalNotes)
-	});
+	const org = await orgRepo.updateOrganizationInternal(ctx.organization.id, { status: input.status });
 	return org.name;
 }
 

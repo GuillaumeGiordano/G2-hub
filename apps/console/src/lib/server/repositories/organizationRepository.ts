@@ -69,56 +69,19 @@ export async function countsOf(id: string) {
 	return { applications: row?._count.applications ?? 0, members: row?._count.memberships ?? 0 };
 }
 
-const profileSelect = {
-	legalName: true,
-	legalForm: true,
-	siret: true,
-	vatNumber: true,
-	nafCode: true,
-	logoKey: true,
-	email: true,
-	phone: true,
-	website: true,
-	addressLine1: true,
-	addressLine2: true,
-	postalCode: true,
-	city: true,
-	country: true,
-	billingSameAddress: true,
-	billingAddressLine1: true,
-	billingAddressLine2: true,
-	billingPostalCode: true,
-	billingCity: true,
-	billingCountry: true,
-	billingEmail: true,
-	billingContactName: true,
-	purchaseOrderRef: true,
-	contactName: true,
-	contactRole: true,
-	contactEmail: true,
-	contactPhone: true,
-	dpoName: true,
-	dpoEmail: true,
-	status: true,
-	contractStartedAt: true,
-	internalNotes: true
-} as const;
-
-/** The profile and contract of an organization (« Mon organisation »). */
+/** What « Mon organisation » reads besides the active organization: the legal and billing profile
+ *  lives in g2-erp (DECISIONS.md §31). */
 export function findOrganizationProfile(id: string) {
-	return prisma.organization.findUnique({ where: { id }, select: profileSelect });
+	return prisma.organization.findUnique({ where: { id }, select: { logoKey: true, status: true } });
 }
 
-/** Fields an Admin edits (name + profile). */
-export function updateOrganizationProfile(id: string, data: Prisma.OrganizationUpdateInput) {
-	return prisma.organization.update({ where: { id }, data, select: { name: true } });
+/** The name, edited by the organization's Admins. */
+export function updateOrganizationName(id: string, name: string) {
+	return prisma.organization.update({ where: { id }, data: { name }, select: { name: true } });
 }
 
-/** Contract fields (superadmin) and the logo key. */
-export function updateOrganizationInternal(
-	id: string,
-	data: Pick<Prisma.OrganizationUpdateInput, 'status' | 'contractStartedAt' | 'internalNotes' | 'logoKey'>
-) {
+/** The status (superadmin) and the logo key. */
+export function updateOrganizationInternal(id: string, data: Pick<Prisma.OrganizationUpdateInput, 'status' | 'logoKey'>) {
 	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
 

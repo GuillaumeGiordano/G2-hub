@@ -1,4 +1,4 @@
-import type { LegalForm, OrganizationStatus, OrgRole } from '$lib/records/organization';
+import type { OrganizationStatus, OrgRole } from '$lib/records/organization';
 
 /** A row of the organizations list. */
 export type OrganizationListItem = {
@@ -51,53 +51,12 @@ export type MyOrganization = {
 	role: OrgRole | null;
 	/** Member of several organizations: may switch to another one. */
 	canSwitch: boolean;
-	/** May edit the profile (its Admins, the superadmin). */
+	/** May edit the name and the logo (its Admins, the superadmin). */
 	canEdit: boolean;
-	/** The superadmin: also edits the contract and reads the internal notes. */
+	/** The superadmin: also sets the status. */
 	isSuperadmin: boolean;
 	logoUrl: string | null;
-	profile: OrganizationProfile;
-	contract: OrganizationContract;
-};
-
-/** What the organization's Admins fill in (every field optional for now, §31). */
-export type OrganizationProfile = {
-	legalName: string | null;
-	legalForm: LegalForm | null;
-	siret: string | null;
-	vatNumber: string | null;
-	nafCode: string | null;
-	email: string | null;
-	phone: string | null;
-	website: string | null;
-	addressLine1: string | null;
-	addressLine2: string | null;
-	postalCode: string | null;
-	city: string | null;
-	country: string | null;
-	billingSameAddress: boolean;
-	billingAddressLine1: string | null;
-	billingAddressLine2: string | null;
-	billingPostalCode: string | null;
-	billingCity: string | null;
-	billingCountry: string | null;
-	billingEmail: string | null;
-	billingContactName: string | null;
-	purchaseOrderRef: string | null;
-	contactName: string | null;
-	contactRole: string | null;
-	contactEmail: string | null;
-	contactPhone: string | null;
-	dpoName: string | null;
-	dpoEmail: string | null;
-};
-
-/** Written by the superadmin. `internalNotes` is null for anyone else (never sent to the page). */
-export type OrganizationContract = {
 	status: OrganizationStatus;
-	/** YYYY-MM-DD, or null. */
-	contractStartedAt: string | null;
-	internalNotes: string | null;
 };
 
 /** A card of « Mes organisations » (an Admin of several organizations, §36). */
