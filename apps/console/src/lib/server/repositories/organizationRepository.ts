@@ -38,6 +38,7 @@ export function searchOrganizations(params: {
 			quotaBytes: true,
 			authEnabled: true,
 			storageEnabled: true,
+			maxAppUsers: true,
 			status: true,
 			// The superadmin is never counted among an organization's members (§34).
 			_count: {
@@ -120,14 +121,14 @@ export async function slugTaken(slug: string, excludeId?: string): Promise<boole
 
 export function createOrganization(
 	tx: Prisma.TransactionClient,
-	data: { name: string; slug: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean }
+	data: { name: string; slug: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean; maxAppUsers: number }
 ) {
 	return tx.organization.create({ data, select: { id: true, name: true } });
 }
 
 export function updateOrganization(
 	id: string,
-	data: { name: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean }
+	data: { name: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean; maxAppUsers: number }
 ) {
 	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
@@ -141,6 +142,7 @@ const billingSelect = {
 	quotaBytes: true,
 	authEnabled: true,
 	storageEnabled: true,
+	maxAppUsers: true,
 	createdAt: true,
 	_count: { select: { memberships: true, applications: true, appUsers: true } }
 } as const;
@@ -155,7 +157,10 @@ export function findOrganizationForBilling(id: string) {
 }
 
 /** The plan only (tier + offers) — what the portal changes after a payment. */
-export function updatePlan(id: string, data: { quotaBytes?: bigint; authEnabled?: boolean; storageEnabled?: boolean }) {
+export function updatePlan(
+	id: string,
+	data: { quotaBytes?: bigint; authEnabled?: boolean; storageEnabled?: boolean; maxAppUsers?: number }
+) {
 	return prisma.organization.update({ where: { id }, data, select: { id: true } });
 }
 

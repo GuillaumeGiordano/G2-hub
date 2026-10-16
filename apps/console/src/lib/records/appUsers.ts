@@ -37,6 +37,13 @@ export const appUserRoleVariant: Record<AppUserRole, 'primary' | 'info' | 'defau
 
 export const appUserRoleOptions = APP_USER_ROLES.map((r) => ({ value: r, label: appUserRoleLabel[r] }));
 
+/** Application users an organization may have, all applications together (DECISIONS.md §39). */
+export const DEFAULT_MAX_APP_USERS = 1000;
+export const MAX_APP_USERS_LIMIT = 100_000;
+
+/** « Active »: signed in to one of its applications within this many days (dashboard, §39). */
+export const ACTIVE_USER_DAYS = 30;
+
 /** How long the e-mailed links stay valid. */
 export const INVITATION_VALID_DAYS = 7;
 export const PASSWORD_RESET_VALID_MINUTES = 60;

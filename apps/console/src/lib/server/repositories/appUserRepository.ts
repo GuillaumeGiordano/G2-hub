@@ -201,3 +201,19 @@ export async function sentTokenSince(appUserId: string, purpose: TokenPurpose, s
 export function findApplicationName(id: string) {
 	return prisma.application.findUnique({ where: { id }, select: { id: true, name: true } });
 }
+
+// ─── Limit and activity (DECISIONS.md §39) ────────────────────────────────────
+
+/** How many users an organization has (all its applications), and its limit. */
+export async function findUserAllowance(organizationId: string) {
+	const [org, count] = await Promise.all([
+		prisma.organization.findUnique({ where: { id: organizationId }, select: { maxAppUsers: true } }),
+		prisma.appUser.count({ where: { organizationId } })
+	]);
+	return org ? { count, max: org.maxAppUsers } : null;
+}
+
+/** Users who signed in since `since` (all its applications). */
+export function countActiveAppUsers(organizationId: string, since: Date) {
+	return prisma.appUser.count({ where: { organizationId, lastLoginAt: { gte: since } } });
+}

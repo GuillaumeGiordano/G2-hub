@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { checkbox, email, requiredString } from '$lib/validation';
 import { QUOTA_TIERS } from '$lib/records/organization';
+import { MAX_APP_USERS_LIMIT } from '$lib/records/appUsers';
 
 // Organization forms (superadmin) — shared by the server actions and the browser (`FieldErrors`).
 
@@ -13,7 +14,12 @@ const organizationFields = {
 	name: requiredString("Nom de l'organisation requis"),
 	quotaBytes: quota,
 	authEnabled: checkbox(),
-	storageEnabled: checkbox()
+	storageEnabled: checkbox(),
+	maxAppUsers: z.coerce
+		.number('Nombre requis')
+		.int('Nombre entier requis')
+		.min(1, 'Au moins 1')
+		.max(MAX_APP_USERS_LIMIT, `${MAX_APP_USERS_LIMIT.toLocaleString('fr-FR')} au plus`)
 };
 
 /** At least one offer: without any, its Admins cannot open the organization (§12). */

@@ -12,6 +12,7 @@ type OrganizationRow = {
 
 type OrganizationListRow = OrganizationRow & {
 	status: OrganizationStatus;
+	maxAppUsers: number;
 	_count: { memberships: number; applications: number; files: number };
 	memberships: { role: OrgRole }[];
 };
@@ -26,6 +27,7 @@ export function toOrganizationListItem(row: OrganizationListRow, usedBytes: bigi
 		usedBytes: Number(usedBytes),
 		authEnabled: row.authEnabled,
 		storageEnabled: row.storageEnabled,
+		maxAppUsers: row.maxAppUsers,
 		status: row.status,
 		memberCount: row._count.memberships,
 		applicationCount: row._count.applications,

@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { Button, Card, EmptyState } from '@guillaumeg/ui';
+	import { Button, Card, EmptyState, Progress } from '@guillaumeg/ui';
 	import { AppWindow, Building2, Users } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { orgPath } from '$lib/utils/orgPath';
 	import StorageOverview from '$lib/components/storage/StorageOverview.svelte';
 	import OfferBadges from '$lib/components/OfferBadges.svelte';
-	import { formatBytes, orgRoleLabel } from '$lib/records/organization';
+	import { ACTIVE_USER_DAYS } from '$lib/records/appUsers';
+	import { formatBytes, orgRoleLabel, usageLevel, usageLevelColor, usagePercent } from '$lib/records/organization';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -40,6 +41,25 @@
 				{#if data.isSuperadmin}<Button variant="outline" icon={Users} href={orgPath(org.id, '/membres')}>Membres</Button>{/if}
 			</div>
 		</Card>
+
+		{#if data.users}
+			<Card>
+				{#snippet header()}
+					<div class="card-title">Utilisateurs des applications</div>
+				{/snippet}
+				<dl class="facts">
+					<div>
+						<dt>Comptes</dt>
+						<dd>{data.users.total} / {data.users.max}</dd>
+					</div>
+					<div>
+						<dt>Actifs ({ACTIVE_USER_DAYS} derniers jours)</dt>
+						<dd>{data.users.active}</dd>
+					</div>
+				</dl>
+				<Progress value={usagePercent(data.users.total, data.users.max)} color={usageLevelColor[usageLevel(data.users.total, data.users.max)]} />
+			</Card>
+		{/if}
 
 		{#if data.storage}
 			<StorageOverview storage={data.storage} />

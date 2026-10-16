@@ -12,12 +12,13 @@ import { sendMail } from '$lib/server/mail/mailer';
 import { invitationMail, passwordResetMail } from '$lib/server/mail/templates';
 import { hashPassword } from '$lib/server/passwords';
 import {
+	ACTIVE_USER_DAYS,
 	INVITATION_VALID_DAYS,
 	PASSWORD_RESET_VALID_MINUTES,
 	type AppUserRole,
 	type AppUserStatus
 } from '$lib/records/appUsers';
-import type { AppUserListItem, PasswordLink } from '$lib/viewmodels/appUser';
+import type { AppUserListItem, AppUserUsage, PasswordLink } from '$lib/viewmodels/appUser';
 import { applicationOrThrow } from './folderService';
 
 // Application users — the people who sign in to a client's PORTAL (DECISIONS.md §24). Their account
@@ -60,6 +61,15 @@ export async function invite(scope: InviteScope, input: InviteInput): Promise<In
 	const email = normalizeEmail(input.email);
 	const existing = await userRepo.findAppUserByEmail(scope.applicationId, email);
 	if (existing) throw alreadyThere(existing.passwordHash !== null);
+	// The Auth offer's limit, all applications of the organization together (§39). Two invitations
+	// at the same instant may both pass: a limit of the plan, not a security boundary.
+	const allowance = await userRepo.findUserAllowance(scope.organizationId);
+	if (allowance && allowance.count >= allowance.max) {
+		throw new HubError(
+			`Limite atteinte : ${allowance.max} utilisateurs pour cette organisation. Supprimez des comptes ou contactez votre prestataire.`,
+			{ field: 'email', status: 409 }
+		);
+	}
 
 	const link = newLink();
 	let id: string;
@@ -135,6 +145,18 @@ export async function listAppUsers(
 	const usage = await fileRepo.personalUsageByUser(ctx.organization.id, rows.map((r) => r.id));
 	const now = new Date();
 	return { items: rows.map((r) => toAppUserListItem(r, usage.get(r.id), now)), total };
+}
+
+/** The organization's users against its limit, and how many are active (dashboard, §39). */
+export async function usage(ctx: OrgContext): Promise<AppUserUsage | null> {
+	assertCan(ctx, 'read');
+	if (!ctx.organization.authEnabled) return null;
+	const since = new Date(Date.now() - ACTIVE_USER_DAYS * DAY_MS);
+	const [allowance, active] = await Promise.all([
+		userRepo.findUserAllowance(ctx.organization.id),
+		userRepo.countActiveAppUsers(ctx.organization.id, since)
+	]);
+	return allowance ? { total: allowance.count, max: allowance.max, active } : null;
 }
 
 export async function inviteAppUser(ctx: OrgContext, applicationId: string, input: InviteInput) {

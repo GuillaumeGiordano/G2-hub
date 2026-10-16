@@ -32,6 +32,7 @@
 		usageLevel,
 		usagePercent
 	} from '$lib/records/organization';
+	import { DEFAULT_MAX_APP_USERS } from '$lib/records/appUsers';
 	import { organizationCreateSchema, organizationUpdateSchema } from '$lib/schemas/organization';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
@@ -55,8 +56,9 @@
 	let fQuota = $state(String(DEFAULT_QUOTA_BYTES));
 	let fAuth = $state(true);
 	let fStorage = $state(true);
+	let fMaxUsers = $state(String(DEFAULT_MAX_APP_USERS));
 	const formErrors = new FieldErrors(
-		['name', 'quotaBytes', 'authEnabled', 'ownerName', 'ownerEmail'],
+		['name', 'quotaBytes', 'authEnabled', 'maxAppUsers', 'ownerName', 'ownerEmail'],
 		() => (editing ? organizationUpdateSchema : organizationCreateSchema)
 	);
 
@@ -86,6 +88,7 @@
 		fQuota = String(DEFAULT_QUOTA_BYTES);
 		fAuth = true;
 		fStorage = true;
+		fMaxUsers = String(DEFAULT_MAX_APP_USERS);
 		formErrors.clear();
 		modal(FORM_MODAL_ID)?.showModal();
 	}
@@ -96,6 +99,7 @@
 		fQuota = String(org.quotaBytes);
 		fAuth = org.authEnabled;
 		fStorage = org.storageEnabled;
+		fMaxUsers = String(org.maxAppUsers);
 		formErrors.clear();
 		modal(FORM_MODAL_ID)?.showModal();
 	}
@@ -245,6 +249,16 @@
 		<div class="section-title">Offres</div>
 		<Switch bind:checked={fAuth} label="Auth" hint={offerHint.AUTH} error={formErrors.get('authEnabled')} />
 		<input type="hidden" name="authEnabled" value={fAuth ? 'on' : ''} />
+		<Input
+			bind:value={fMaxUsers}
+			error={formErrors.get('maxAppUsers')}
+			label="Utilisateurs maximum"
+			name="maxAppUsers"
+			type="number"
+			min={1}
+			readonly={!fAuth}
+			hint="Utilisateurs de toutes ses applications réunies."
+		/>
 		<Switch bind:checked={fStorage} label="Stockage" hint={offerHint.STORAGE} />
 		<input type="hidden" name="storageEnabled" value={fStorage ? 'on' : ''} />
 		<Select

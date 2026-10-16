@@ -30,6 +30,8 @@ model Organization {
   /// any, the organization's Admins cannot open it.
   authEnabled    Boolean  @default(true)
   storageEnabled Boolean  @default(true)
+  /// Most application users (all its applications together) the Auth offer allows (§39).
+  maxAppUsers    Int      @default(1000)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

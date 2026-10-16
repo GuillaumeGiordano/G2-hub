@@ -11,6 +11,8 @@ export type OrganizationListItem = {
 	/** The two independent offers (§12). */
 	authEnabled: boolean;
 	storageEnabled: boolean;
+	/** Most application users allowed (§39). */
+	maxAppUsers: number;
 	status: OrganizationStatus;
 	memberCount: number;
 	applicationCount: number;

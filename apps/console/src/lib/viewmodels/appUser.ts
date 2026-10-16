@@ -25,3 +25,11 @@ export type PasswordLink = {
 	email: string;
 	applicationName: string;
 };
+
+/** The organization's application users against the Auth offer's limit (dashboard, §39). */
+export type AppUserUsage = {
+	total: number;
+	max: number;
+	/** Signed in within the last ACTIVE_USER_DAYS days. */
+	active: number;
+};

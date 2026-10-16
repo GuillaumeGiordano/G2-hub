@@ -1,3 +1,4 @@
+import * as appUserService from '$lib/server/services/appUserService';
 import * as storageService from '$lib/server/services/storageService';
 import type { PageServerLoad } from './$types';
 
@@ -6,5 +7,9 @@ import type { PageServerLoad } from './$types';
 // organization of the address is one the account may open: `locals.orgContext` is set.
 export const load: PageServerLoad = async ({ locals }) => {
 	const ctx = locals.orgContext!;
-	return { storage: ctx.organization.storageEnabled ? await storageService.overview(ctx) : null };
+	const [storage, users] = await Promise.all([
+		ctx.organization.storageEnabled ? storageService.overview(ctx) : null,
+		appUserService.usage(ctx)
+	]);
+	return { storage, users };
 };

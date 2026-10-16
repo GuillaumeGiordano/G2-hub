@@ -22,6 +22,8 @@ export type InternalOrganization = {
 	members: number;
 	applications: number;
 	appUsers: number;
+	/** The Auth offer's limit of application users (§39). */
+	maxAppUsers: number;
 	createdAt: string;
 };
 
@@ -39,6 +41,7 @@ function toInternal(row: BillingRow, usedBytes: bigint): InternalOrganization {
 		members: row._count.memberships,
 		applications: row._count.applications,
 		appUsers: row._count.appUsers,
+		maxAppUsers: row.maxAppUsers,
 		createdAt: row.createdAt.toISOString()
 	};
 }
@@ -65,7 +68,7 @@ export async function updatePlan(id: string, body: unknown): Promise<InternalOrg
 	const parsed = internalPlanSchema.safeParse(body);
 	if (!parsed.success) throw new HubError(firstIssue(parsed.error));
 	const current = await getOrganization(id);
-	const { quotaBytes, authEnabled, storageEnabled } = parsed.data;
+	const { quotaBytes, authEnabled, storageEnabled, maxAppUsers } = parsed.data;
 	if (quotaBytes !== undefined && quotaBytes < current.usedBytes) {
 		throw new HubError(
 			`L'organisation stocke déjà ${formatBytes(current.usedBytes)} : le palier ${formatBytes(quotaBytes)} est trop petit.`,
@@ -75,7 +78,8 @@ export async function updatePlan(id: string, body: unknown): Promise<InternalOrg
 	await orgRepo.updatePlan(id, {
 		...(quotaBytes !== undefined && { quotaBytes: BigInt(quotaBytes) }),
 		...(authEnabled !== undefined && { authEnabled }),
-		...(storageEnabled !== undefined && { storageEnabled })
+		...(storageEnabled !== undefined && { storageEnabled }),
+		...(maxAppUsers !== undefined && { maxAppUsers })
 	});
 	return getOrganization(id);
 }
