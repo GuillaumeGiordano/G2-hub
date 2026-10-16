@@ -19,6 +19,8 @@ import {
 	type AppUserStatus
 } from '$lib/records/appUsers';
 import type { AppUserListItem, AppUserUsage, PasswordLink } from '$lib/viewmodels/appUser';
+import type { SignInClient } from '$lib/viewmodels/signIn';
+import { recordSignIn } from './signInLogService';
 import { applicationOrThrow } from './folderService';
 
 // Application users — the people who sign in to a client's PORTAL (DECISIONS.md §24). Their account
@@ -327,11 +329,24 @@ export async function passwordLink(token: string): Promise<PasswordLink | null> 
 }
 
 /** Set the password from an invitation or reset link (which then stops working). */
-export async function choosePassword(token: string, password: string): Promise<{ applicationName: string }> {
+export async function choosePassword(
+	token: string,
+	password: string,
+	client: SignInClient
+): Promise<{ applicationName: string }> {
 	const row = await usableLink(token);
 	if (!row) throw new HubError(INVALID_LINK);
 	const used = await userRepo.useTokenAndSetPassword(row.id, row.appUser.id, await hashPassword(password));
 	if (!used) throw new HubError(INVALID_LINK);
+	recordSignIn({
+		organizationId: row.appUser.organizationId,
+		applicationId: row.appUser.applicationId,
+		appUserId: row.appUser.id,
+		email: row.appUser.email,
+		outcome: row.purpose === 'INVITATION' ? 'PASSWORD_SET' : 'PASSWORD_RESET',
+		method: 'EMAIL_LINK',
+		client
+	});
 	return { applicationName: row.appUser.application.name };
 }
 

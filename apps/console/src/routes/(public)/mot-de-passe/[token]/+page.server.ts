@@ -3,6 +3,7 @@ import { parseForm } from '$lib/validation';
 import { passwordChooseSchema } from '$lib/schemas/appUser';
 import { actionFailure } from '$lib/server/http';
 import * as appUserService from '$lib/server/services/appUserService';
+import { clientOf } from '$lib/server/services/signInLogService';
 import type { Actions, PageServerLoad } from './$types';
 
 // « Choisir un mot de passe » — opened from an invitation or reset e-mail by an APPLICATION user
@@ -15,11 +16,12 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, params }) => {
+	default: async (event) => {
+		const { request, params } = event;
 		const parsed = parseForm(await request.formData(), passwordChooseSchema);
 		if (!parsed.success) return fail(400, { errors: parsed.errors });
 		try {
-			return { done: await appUserService.choosePassword(params.token, parsed.data.password) };
+			return { done: await appUserService.choosePassword(params.token, parsed.data.password, clientOf(event)) };
 		} catch (err) {
 			return actionFailure(err);
 		}

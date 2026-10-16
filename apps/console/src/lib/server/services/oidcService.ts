@@ -17,6 +17,9 @@ import {
 import type { PlatformAccess } from '$lib/records/platform';
 import { isSuperadmin } from '$lib/records/roles';
 import type { AppUserRole } from '$lib/records/appUsers';
+import type { SignInOutcome } from '$lib/records/signIns';
+import type { SignInClient } from '$lib/viewmodels/signIn';
+import { recordSignIn } from './signInLogService';
 
 // « Se connecter avec G2 Hub » — the OpenID Connect provider (DECISIONS.md §25). Only the
 // Authorization Code flow with PKCE, for portals that have a server (confidential clients):
@@ -161,13 +164,33 @@ let decoyHash: Promise<string> | null = null;
 
 export type SignInResult = { ok: true; location: string } | { ok: false; message: string };
 
-/** Check the password; on success issue a code and return where to send the user back. */
-export async function signIn(request: AuthorizeRequest, email: string, password: string): Promise<SignInResult> {
+/** Check the password; on success issue a code and return where to send the user back. Every
+ *  attempt goes to the application's sign-in log (§40) — the answer stays the same for an unknown
+ *  address and a wrong password. */
+export async function signIn(
+	request: AuthorizeRequest,
+	email: string,
+	password: string,
+	client: SignInClient
+): Promise<SignInResult> {
 	const normalized = email.trim().toLowerCase();
 	const key = `${request.application.id}:${normalized}`;
 	// Application users belong to the Auth offer of the organization owning the application (§12).
 	if (!request.application.authEnabled) return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
-	if (tooManyFailures(key)) return { ok: false, message: 'Trop de tentatives. Réessayez dans quelques minutes.' };
+	const log = (outcome: SignInOutcome, appUserId: string | null = null) =>
+		recordSignIn({
+			organizationId: request.application.organizationId,
+			applicationId: request.application.id,
+			appUserId,
+			email: normalized,
+			outcome,
+			method: 'PASSWORD',
+			client
+		});
+	if (tooManyFailures(key)) {
+		log('TOO_MANY_ATTEMPTS');
+		return { ok: false, message: 'Trop de tentatives. Réessayez dans quelques minutes.' };
+	}
 
 	const user = await userRepo.findAppUserByEmail(request.application.id, normalized);
 	let valid = false;
@@ -175,10 +198,15 @@ export async function signIn(request: AuthorizeRequest, email: string, password:
 	else await verifyPassword(password, await (decoyHash ??= hashPassword(token())));
 	if (!user || !valid) {
 		recordFailure(key);
+		log(!user ? 'UNKNOWN_ACCOUNT' : !user.passwordHash ? 'NOT_ACTIVATED' : 'WRONG_PASSWORD', user?.id ?? null);
 		return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
 	}
-	if (user.disabledAt) return { ok: false, message: 'Ce compte est désactivé. Contactez le responsable du portail.' };
+	if (user.disabledAt) {
+		log('DISABLED', user.id);
+		return { ok: false, message: 'Ce compte est désactivé. Contactez le responsable du portail.' };
+	}
 	failures.delete(key);
+	log('SUCCESS', user.id);
 
 	const location = await issueCode(request, { appUserId: user.id }, new Date());
 	await oidcRepo.touchLastLogin(user.id);
@@ -267,7 +295,8 @@ export async function signInAsConsoleMember(
 	request: AuthorizeRequest,
 	userId: string,
 	signedInAt: Date,
-	organizationId: string | null
+	organizationId: string | null,
+	client: SignInClient
 ): Promise<SignInResult> {
 	const account = await oidcRepo.findConsoleAccount(userId);
 	const grant = account && (await consoleGrant(account, request.application));
@@ -275,10 +304,21 @@ export async function signInAsConsoleMember(
 	if (!account.twoFactorEnabled) {
 		return { ok: false, message: 'Activez d’abord la double authentification dans la console (page Sécurité).' };
 	}
-	if (!grant.organizations) return { ok: true, location: await issueCode(request, { userId: account.id }, signedInAt) };
-	const organization = grant.organizations.find((o) => o.id === organizationId);
-	if (!organization) return { ok: false, message: 'Choisissez une organisation pour laquelle cet outil est activé.' };
-	const holder = { userId: account.id, organizationId: organization.id };
+	const organization = grant.organizations?.find((o) => o.id === organizationId) ?? null;
+	if (grant.organizations && !organization) {
+		return { ok: false, message: 'Choisissez une organisation pour laquelle cet outil est activé.' };
+	}
+	// In the log of the application (its owner's), like an application user's sign-in (§40).
+	recordSignIn({
+		organizationId: request.application.organizationId,
+		applicationId: request.application.id,
+		userId: account.id,
+		email: account.email,
+		outcome: 'SUCCESS',
+		method: 'CONSOLE_SESSION',
+		client
+	});
+	const holder = organization ? { userId: account.id, organizationId: organization.id } : { userId: account.id };
 	return { ok: true, location: await issueCode(request, holder, signedInAt) };
 }
 

@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { checkAuthorizeRequest, consoleSignIn, signIn, signInAsConsoleMember } from '$lib/server/services/oidcService';
+import { clientOf } from '$lib/server/services/signInLogService';
 import type { Actions, PageServerLoad } from './$types';
 
 // « Se connecter avec G2 Hub » — the sign-in page a portal sends its user to (§25). The form posts
@@ -34,7 +35,8 @@ export const load: PageServerLoad = async ({ url, locals, setHeaders }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, url, locals }) => {
+	default: async (event) => {
+		const { request, url, locals } = event;
 		const check = await checkAuthorizeRequest(url.searchParams);
 		if (check.kind === 'redirect') redirect(303, check.location);
 		if (check.kind === 'fatal') return fail(400, { message: check.message, email: '' });
@@ -43,7 +45,13 @@ export const actions: Actions = {
 		if (form.get('as') === 'admin') {
 			if (!locals.user || !locals.session) return fail(400, { message: 'Connectez-vous d’abord à la console.', email: '' });
 			const organizationId = String(form.get('organization') ?? '') || null;
-			const result = await signInAsConsoleMember(check.request, locals.user.id, locals.session.createdAt, organizationId);
+			const result = await signInAsConsoleMember(
+				check.request,
+				locals.user.id,
+				locals.session.createdAt,
+				organizationId,
+				clientOf(event)
+			);
 			if (!result.ok) return fail(400, { message: result.message, email: '' });
 			redirect(303, result.location);
 		}
@@ -52,7 +60,7 @@ export const actions: Actions = {
 		const password = String(form.get('password') ?? '');
 		if (!email.trim() || !password) return fail(400, { message: 'Saisissez votre e-mail et votre mot de passe.', email });
 
-		const result = await signIn(check.request, email, password);
+		const result = await signIn(check.request, email, password, clientOf(event));
 		if (!result.ok) return fail(400, { message: result.message, email });
 		redirect(303, result.location);
 	}

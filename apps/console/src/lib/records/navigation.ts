@@ -114,7 +114,12 @@ export function applicationTabs(organizationId: string, applicationId: string, c
 	const base = orgPath(organizationId, `/applications/${applicationId}`);
 	return [
 		{ label: 'Fichiers', href: base },
-		...(authEnabled ? [{ label: 'Utilisateurs', href: `${base}/utilisateurs` }] : []),
+		...(authEnabled
+			? [
+					{ label: 'Utilisateurs', href: `${base}/utilisateurs` },
+					{ label: 'Journal des connexions', href: `${base}/journal` }
+				]
+			: []),
 		...(canManage
 			? [
 					{ label: 'Clés API', href: `${base}/cles` },

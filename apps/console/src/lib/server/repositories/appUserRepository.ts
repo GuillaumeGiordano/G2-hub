@@ -159,6 +159,8 @@ export function findTokenByHash(hash: string) {
 			appUser: {
 				select: {
 					id: true,
+					organizationId: true,
+					applicationId: true,
 					name: true,
 					email: true,
 					passwordHash: true,

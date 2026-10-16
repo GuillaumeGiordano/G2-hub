@@ -52,6 +52,7 @@ model Organization {
   /// « Se connecter avec G2 Hub » to a tool, for this organization (§38).
   oidcAuthCodes    OidcAuthCode[]
   oidcAccessTokens OidcAccessToken[]
+  signInEvents     SignInEvent[]
 }
 
 /// A console account's rights inside ONE organization (an account may belong to several).
@@ -116,6 +117,7 @@ model Application {
   accessTokens OidcAccessToken[]
   /// Organizations this tool is enabled for (PER_ORGANIZATION, §38).
   enabledFor   OrganizationTool[]
+  signInEvents SignInEvent[]
 
   @@unique([organizationId, slug])
 }
@@ -369,6 +371,7 @@ model User {
   /// « Se connecter avec G2 Hub » as an Admin of the application's organization (§26).
   oidcAuthCodes    OidcAuthCode[]
   oidcAccessTokens OidcAccessToken[]
+  signInEvents     SignInEvent[]
 
   @@map("user")
 }
@@ -469,6 +472,7 @@ model AppUser {
   updatedAt      DateTime     @updatedAt
 
   tokens       AppUserToken[]
+  signInEvents SignInEvent[]
   folders      Folder[]
   files        StoredFile[]
   authCodes    OidcAuthCode[]
@@ -564,4 +568,57 @@ model OidcSigningKey {
   publicJwk     Json
   privateKeyPem String
   createdAt     DateTime @default(now())
+}
+
+// ─── Sign-in log (DECISIONS.md §40) ──────────────────────────────────────────
+
+/// What happened at a sign-in to an application.
+enum SignInOutcome {
+  SUCCESS
+  WRONG_PASSWORD
+  /// No account with this address in the application (the typed address is kept).
+  UNKNOWN_ACCOUNT
+  /// Invited, password never chosen.
+  NOT_ACTIVATED
+  DISABLED
+  /// Blocked after too many failures (5 in 5 minutes).
+  TOO_MANY_ATTEMPTS
+  /// Password chosen from an invitation link.
+  PASSWORD_SET
+  /// Password changed from a reset link.
+  PASSWORD_RESET
+}
+
+enum SignInMethod {
+  /// The sign-in form of « Se connecter avec G2 Hub ».
+  PASSWORD
+  /// « Continuer en tant que … » with the console session (§26, §38).
+  CONSOLE_SESSION
+  /// An e-mailed single-use link (invitation, reset).
+  EMAIL_LINK
+}
+
+/// One sign-in attempt to an application, shown to its organization's Admins. Kept 6 months
+/// (purged by the worker): the IP address is personal data.
+model SignInEvent {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  application    Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Who, when known — kept as null if the account is deleted later (the e-mail stays).
+  appUserId      String?
+  appUser        AppUser?      @relation(fields: [appUserId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email          String
+  outcome        SignInOutcome
+  method         SignInMethod
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([applicationId, createdAt])
+  @@index([organizationId])
+  @@index([createdAt])
 }
