@@ -10,9 +10,12 @@ import {
 	AUTH_CODE_TTL,
 	ID_TOKEN_TTL,
 	MEMBER_SUBJECT_PREFIX,
+	ORGANIZATION_PARAM,
 	SSO_ROLE_CLAIM,
 	SSO_SCOPES
 } from '$lib/records/sso';
+import type { PlatformAccess } from '$lib/records/platform';
+import { isSuperadmin } from '$lib/records/roles';
 import type { AppUserRole } from '$lib/records/appUsers';
 
 // « Se connecter avec G2 Hub » — the OpenID Connect provider (DECISIONS.md §25). Only the
@@ -21,7 +24,8 @@ import type { AppUserRole } from '$lib/records/appUsers';
 //      state, nonce, code_challenge);
 //   2. the user signs in HERE with their account of THAT application (an AppUser) — or, being an
 //      Admin of the application's organization already signed in to the console (2FA done),
-//      continues with that session (§26);
+//      continues with that session (§26) — also, on an application of the platform, an Admin of
+//      ANY organization (§38: the client portal, or a tool entered for one organization);
 //   3. the hub sends them back to redirect_uri with a single-use code (60 s);
 //   4. the portal's server exchanges code + code_verifier + client secret at /oauth/token for an
 //      ID token (signed JWT: who the user is) and an access token (for /oauth/userinfo).
@@ -49,7 +53,9 @@ export class OAuthError extends Error {
 // ─── 1. Authorization request ────────────────────────────────────────────────
 
 export type AuthorizeRequest = {
-	application: { id: string; name: string };
+	application: { id: string; name: string; organizationId: string; platformAccess: PlatformAccess };
+	/** The organization a console member enters a TOOL for (§38), as the tool asked — checked later. */
+	organizationId: string | null;
 	redirectUri: string;
 	scope: string[];
 	state: string | null;
@@ -105,7 +111,13 @@ export async function checkAuthorizeRequest(params: URLSearchParams): Promise<Au
 	return {
 		kind: 'ok',
 		request: {
-			application: { id: client.id, name: client.name },
+			application: {
+				id: client.id,
+				name: client.name,
+				organizationId: client.organizationId,
+				platformAccess: client.platformAccess
+			},
+			organizationId: params.get(ORGANIZATION_PARAM) || null,
 			redirectUri,
 			scope: scope.filter((s) => (SSO_SCOPES as readonly string[]).includes(s)),
 			state,
@@ -167,30 +179,106 @@ export async function signIn(request: AuthorizeRequest, email: string, password:
 	return { ok: true, location };
 }
 
-/** The console member if they are an Admin of the requesting application's organization, else null. */
-export async function applicationAdmin(request: AuthorizeRequest, userId: string) {
-	const admin = await oidcRepo.findApplicationAdmin(userId, request.application.id);
-	return admin && { name: admin.name, email: admin.email, twoFactorEnabled: admin.twoFactorEnabled };
+// ─── Console members (§26, §38) ──────────────────────────────────────────────
+
+type ConsoleAccount = NonNullable<Awaited<ReturnType<typeof oidcRepo.findConsoleAccount>>>;
+type Organization = { id: string; name: string };
+
+/** What a console member gets in an application: the `role` sent and, for a TOOL, the
+ *  organizations they may enter it for (null: the sign-in is not bound to an organization). */
+type ConsoleGrant = {
+	role: typeof SSO_ROLE_CLAIM.ADMIN | typeof SSO_ROLE_CLAIM.CLIENT;
+	organizations: Organization[] | null;
+};
+
+/**
+ * Whether a console account may enter an application with its session, and how — THE rule, read at
+ * sign-in and again at every use of a code or token:
+ * - a client's application (NONE): the Admins of its organization, as `admin` (§26) — not the
+ *   superadmin, whom the client invites if needed;
+ * - the client portal (ALL_ADMINS): every Admin of any organization, as `client` — `admin` for
+ *   the superadmin and the Admins of the organization owning it (§38);
+ * - a tool (PER_ORGANIZATION): an Admin, FOR one of their organizations the tool is enabled for;
+ *   the superadmin for any organization (§38). Never across organizations.
+ */
+async function consoleGrant(
+	account: ConsoleAccount,
+	application: { id: string; organizationId: string; platformAccess: PlatformAccess }
+): Promise<ConsoleGrant | null> {
+	if (account.disabledAt) return null;
+	const superadmin = isSuperadmin(account.role);
+	const organizations = account.memberships.map((m) => m.organization);
+	const owner = organizations.some((o) => o.id === application.organizationId);
+	const role = superadmin || owner ? SSO_ROLE_CLAIM.ADMIN : SSO_ROLE_CLAIM.CLIENT;
+
+	switch (application.platformAccess) {
+		case 'NONE':
+			return owner ? { role: SSO_ROLE_CLAIM.ADMIN, organizations: null } : null;
+		case 'ALL_ADMINS':
+			return superadmin || organizations.length ? { role, organizations: null } : null;
+		case 'PER_ORGANIZATION': {
+			if (superadmin) return { role, organizations: await oidcRepo.listOrganizations() };
+			const enabled = await oidcRepo.findToolOrganizationIds(application.id);
+			const allowed = organizations.filter((o) => o.id === application.organizationId || enabled.has(o.id));
+			return allowed.length ? { role, organizations: allowed } : null;
+		}
+	}
+}
+
+export type ConsoleSignIn = {
+	name: string;
+	twoFactorEnabled: boolean;
+	role: ConsoleGrant['role'];
+	/** A tool: the organizations to choose from (only the requested one when it is allowed). */
+	organizations: Organization[] | null;
+	/** The tool asked for an organization the member may not enter it for. */
+	requestedUnavailable: boolean;
+};
+
+/** « Continuer en tant que … »: offered to a console member signed in to the hub who may enter the
+ *  requesting application, else null. */
+export async function consoleSignIn(request: AuthorizeRequest, userId: string): Promise<ConsoleSignIn | null> {
+	const account = await oidcRepo.findConsoleAccount(userId);
+	const grant = account && (await consoleGrant(account, request.application));
+	if (!account || !grant) return null;
+	const requested = grant.organizations?.find((o) => o.id === request.organizationId);
+	return {
+		name: account.name,
+		twoFactorEnabled: account.twoFactorEnabled,
+		role: grant.role,
+		organizations: requested ? [requested] : grant.organizations,
+		requestedUnavailable: !!request.organizationId && !!grant.organizations && !requested
+	};
 }
 
 /**
- * « Continuer en tant qu'admin »: a console member signed in to the hub (`signedInAt` = when, for
- * `auth_time`) who is an Admin of the application's organization (§26). Their 2FA must be on —
- * it is mandatory for every member, and the session then proves it was used.
+ * Continue with the console session (`signedInAt` = when, for `auth_time`), for `organizationId`
+ * when the application is a tool. Their 2FA must be on — it is mandatory for every member, and the
+ * session then proves it was used.
  */
-export async function signInAsAdmin(request: AuthorizeRequest, userId: string, signedInAt: Date): Promise<SignInResult> {
-	const admin = await oidcRepo.findApplicationAdmin(userId, request.application.id);
-	if (!admin) return { ok: false, message: "Votre compte n'est pas administrateur de cette application." };
-	if (!admin.twoFactorEnabled) {
+export async function signInAsConsoleMember(
+	request: AuthorizeRequest,
+	userId: string,
+	signedInAt: Date,
+	organizationId: string | null
+): Promise<SignInResult> {
+	const account = await oidcRepo.findConsoleAccount(userId);
+	const grant = account && (await consoleGrant(account, request.application));
+	if (!account || !grant) return { ok: false, message: "Votre compte n'a pas accès à cette application." };
+	if (!account.twoFactorEnabled) {
 		return { ok: false, message: 'Activez d’abord la double authentification dans la console (page Sécurité).' };
 	}
-	return { ok: true, location: await issueCode(request, { userId: admin.id }, signedInAt) };
+	if (!grant.organizations) return { ok: true, location: await issueCode(request, { userId: account.id }, signedInAt) };
+	const organization = grant.organizations.find((o) => o.id === organizationId);
+	if (!organization) return { ok: false, message: 'Choisissez une organisation pour laquelle cet outil est activé.' };
+	const holder = { userId: account.id, organizationId: organization.id };
+	return { ok: true, location: await issueCode(request, holder, signedInAt) };
 }
 
 /** Store a single-use code for `holder` and return the portal URL carrying it. */
 async function issueCode(
 	request: AuthorizeRequest,
-	holder: { appUserId: string } | { userId: string },
+	holder: Holder['ref'],
 	authTime: Date
 ): Promise<string> {
 	const code = token();
@@ -301,31 +389,65 @@ type Holder = {
 	email: string;
 	name: string;
 	role: (typeof SSO_ROLE_CLAIM)[keyof typeof SSO_ROLE_CLAIM];
-	/** To issue the access token to the same holder. */
-	ref: { appUserId: string } | { userId: string };
+	/** A tool: the organization it was entered for (§38). */
+	organization: Organization | null;
+	/** The client portal: the organizations the member is an Admin of (§38). */
+	organizations: Organization[] | null;
+	/** To issue the access token to the same holder (and for the same organization). */
+	ref: { appUserId: string } | { userId: string; organizationId?: string };
 };
 
 type HolderRow = {
 	appUser: { id: string; email: string; name: string; role: AppUserRole; passwordHash: string | null; disabledAt: Date | null } | null;
 	user: { id: string; email: string; name: string } | null;
+	organizationId: string | null;
 };
 
 /**
  * The holder of a code / token if they may STILL use it, else null: an application user not
- * disabled, or a console member still Admin of the application's organization (§26) — removing a
- * member from the organization thus cuts their access to its applications at once.
+ * disabled, or a console member who still passes `consoleGrant` — for the SAME organization on a
+ * tool. Removing a member from an organization, or disabling a tool for it, thus cuts the access
+ * at once (§26, §38).
  */
 async function activeHolder(row: HolderRow, applicationId: string): Promise<Holder | null> {
 	if (row.appUser) {
 		const u = row.appUser;
 		if (u.disabledAt || !u.passwordHash) return null;
-		return { sub: u.id, email: u.email, name: u.name, role: SSO_ROLE_CLAIM[u.role], ref: { appUserId: u.id } };
+		return {
+			sub: u.id,
+			email: u.email,
+			name: u.name,
+			role: SSO_ROLE_CLAIM[u.role],
+			organization: null,
+			organizations: null,
+			ref: { appUserId: u.id }
+		};
 	}
-	if (row.user && (await oidcRepo.findApplicationAdmin(row.user.id, applicationId))) {
-		const u = row.user;
-		return { sub: MEMBER_SUBJECT_PREFIX + u.id, email: u.email, name: u.name, role: SSO_ROLE_CLAIM.ADMIN, ref: { userId: u.id } };
-	}
-	return null;
+	if (!row.user) return null;
+	const [account, application] = await Promise.all([
+		oidcRepo.findConsoleAccount(row.user.id),
+		oidcRepo.findPlatformApplication(applicationId)
+	]);
+	const grant = account && application && (await consoleGrant(account, application));
+	if (!account || !application || !grant) return null;
+
+	let organization: Organization | null = null;
+	if (grant.organizations) {
+		organization = grant.organizations.find((o) => o.id === row.organizationId) ?? null;
+		if (!organization) return null;
+	} else if (row.organizationId) return null;
+
+	return {
+		sub: MEMBER_SUBJECT_PREFIX + account.id,
+		email: account.email,
+		name: account.name,
+		role: grant.role,
+		organization,
+		// Only the client portal learns them: a client's application never sees the OTHER
+		// organizations of its Admin (§38).
+		organizations: application.platformAccess === 'ALL_ADMINS' ? account.memberships.map((m) => m.organization) : null,
+		ref: organization ? { userId: account.id, organizationId: organization.id } : { userId: account.id }
+	};
 }
 
 /** The holder's claims: `role` always (§26), the others as the granted scopes allow. Application
@@ -335,7 +457,9 @@ function claimsFor(scopes: string[], holder: Holder) {
 	return {
 		role: holder.role,
 		...(scopes.includes('email') && { email: holder.email, email_verified: true }),
-		...(scopes.includes('profile') && { name: holder.name })
+		...(scopes.includes('profile') && { name: holder.name }),
+		...(scopes.includes('organization') && holder.organization && { organization: holder.organization }),
+		...(scopes.includes('organizations') && holder.organizations && { organizations: holder.organizations })
 	};
 }
 

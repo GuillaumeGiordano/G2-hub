@@ -72,12 +72,17 @@ model Organization {
   /// Never shown to the organization's members.
   internalNotes       String?
 
-  memberships  Membership[]
-  applications Application[]
-  folders      Folder[]
-  files        StoredFile[]
-  apiKeys      ApiKey[]
-  appUsers     AppUser[]
+  memberships      Membership[]
+  applications     Application[]
+  folders          Folder[]
+  files            StoredFile[]
+  apiKeys          ApiKey[]
+  appUsers         AppUser[]
+  /// Platform tools enabled for this organization (DECISIONS.md §38).
+  tools            OrganizationTool[]
+  /// « Se connecter avec G2 Hub » to a tool, for this organization (§38).
+  oidcAuthCodes    OidcAuthCode[]
+  oidcAccessTokens OidcAccessToken[]
 }
 
 /// A console account's rights inside ONE organization (an account may belong to several).
@@ -101,32 +106,62 @@ model Membership {
 }
 
 /// A client's site / portal / portfolio plugged into the hub (API keys arrive in step 3).
+/// Whether the admins of OTHER organizations may sign in to an application of the platform
+/// (DECISIONS.md §38). Set by the superadmin.
+enum PlatformAccess {
+  /// A client's application: only the Admins of its own organization (§26).
+  NONE
+  /// The client portal: every Admin of any organization, as `client`, at the account level.
+  ALL_ADMINS
+  /// A tool: an Admin enters FOR one organization, if the tool is enabled for it.
+  PER_ORGANIZATION
+}
+
 model Application {
-  id              String       @id @default(uuid())
+  id              String         @id @default(uuid())
   organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name            String
   /// URL-friendly id, unique within the organization.
   slug            String
   /// Origins (scheme + host + port) allowed to call the API from a browser — CORS (§3).
-  allowedOrigins  String[]     @default([])
+  allowedOrigins  String[]       @default([])
   /// « Se connecter avec G2 Hub » (OIDC, DECISIONS.md §25): on when a client secret exists. The
   /// client_id is the application id; only the SHA-256 of the secret is stored.
   ssoSecretHash   String?
   /// First characters of the client secret, to recognize it ("g2_sso_8fK2…").
   ssoSecretPrefix String?
   /// Exact URLs the hub may send a user back to after sign-in (no wildcard).
-  ssoRedirectUris String[]     @default([])
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  ssoRedirectUris String[]       @default([])
+  /// Application of the platform (§38): who outside its organization may sign in.
+  platformAccess  PlatformAccess @default(NONE)
+  /// Where the « Outils » launcher opens it (a tool also receives `?organization=<id>`).
+  homeUrl         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   folders      Folder[]
   apiKeys      ApiKey[]
   appUsers     AppUser[]
   authCodes    OidcAuthCode[]
   accessTokens OidcAccessToken[]
+  /// Organizations this tool is enabled for (PER_ORGANIZATION, §38).
+  enabledFor   OrganizationTool[]
 
   @@unique([organizationId, slug])
+}
+
+/// A tool of the platform enabled for an organization (DECISIONS.md §38), by the superadmin — later
+/// by the management tool (an order / contract). Free for now.
+model OrganizationTool {
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  enabledAt      DateTime     @default(now())
+
+  @@id([organizationId, applicationId])
+  @@index([applicationId])
 }
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
@@ -340,19 +375,19 @@ model MediaJob {
 /// organization) or `member` (a client's account — its rights inside an organization come from
 /// its membership, step 1).
 model User {
-  id               String   @id
+  id               String    @id
   name             String
-  email            String   @unique
-  emailVerified    Boolean  @default(false)
+  email            String    @unique
+  emailVerified    Boolean   @default(false)
   image            String?
-  role             String   @default("member")
+  role             String    @default("member")
   /// Whether two-factor authentication is enabled (Better Auth twoFactor plugin).
-  twoFactorEnabled Boolean  @default(false)
+  twoFactorEnabled Boolean   @default(false)
   /// Set when an Admin (or the superadmin) disables the account: no new session, existing ones
   /// revoked; the account and its memberships are kept (DECISIONS.md §30).
   disabledAt       DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   sessions         Session[]
   accounts         Account[]
@@ -502,25 +537,28 @@ model AppUserToken {
 /// Issued to EXACTLY ONE of: an application user, or a console member who is an Admin of the
 /// application's organization (§26) — enforced by a CHECK constraint (see the migration).
 model OidcAuthCode {
-  id            String      @id @default(uuid())
-  hash          String      @unique
-  applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  appUserId     String?
-  appUser       AppUser?    @relation(fields: [appUserId], references: [id], onDelete: Cascade)
-  userId        String?
-  user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(uuid())
+  hash           String        @unique
+  applicationId  String
+  application    Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  appUserId      String?
+  appUser        AppUser?      @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The organization a console member entered a TOOL for (§38): the tool sees only it.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   /// Must be sent again, identical, with the code.
-  redirectUri   String
+  redirectUri    String
   /// base64url(SHA-256(code_verifier)) — S256 only.
-  codeChallenge String
-  nonce         String?
-  scope         String
+  codeChallenge  String
+  nonce          String?
+  scope          String
   /// When the user typed their password (`auth_time` claim).
-  authTime      DateTime
-  expiresAt     DateTime
-  usedAt        DateTime?
-  createdAt     DateTime    @default(now())
+  authTime       DateTime
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime      @default(now())
 
   @@index([expiresAt])
 }
@@ -529,17 +567,20 @@ model OidcAuthCode {
 /// Stored hashed, so disabling or deleting the user revokes it at once. Same holder rule as the
 /// codes: exactly one of `appUserId` / `userId`.
 model OidcAccessToken {
-  id            String      @id @default(uuid())
-  hash          String      @unique
-  applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  appUserId     String?
-  appUser       AppUser?    @relation(fields: [appUserId], references: [id], onDelete: Cascade)
-  userId        String?
-  user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scope         String
-  expiresAt     DateTime
-  createdAt     DateTime    @default(now())
+  id             String        @id @default(uuid())
+  hash           String        @unique
+  applicationId  String
+  application    Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  appUserId      String?
+  appUser        AppUser?      @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The organization a console member entered a TOOL for (§38): the tool sees only it.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scope          String
+  expiresAt      DateTime
+  createdAt      DateTime      @default(now())
 
   @@index([appUserId])
   @@index([userId])

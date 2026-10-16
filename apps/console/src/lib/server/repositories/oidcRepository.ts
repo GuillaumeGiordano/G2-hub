@@ -38,27 +38,66 @@ export async function revokeApplicationGrants(applicationId: string) {
 export function findSsoClient(applicationId: string) {
 	return prisma.application.findFirst({
 		where: { id: applicationId, ssoSecretHash: { not: null } },
-		select: { id: true, name: true, ssoSecretHash: true, ssoRedirectUris: true }
+		select: {
+			id: true,
+			name: true,
+			organizationId: true,
+			platformAccess: true,
+			ssoSecretHash: true,
+			ssoRedirectUris: true
+		}
+	});
+}
+
+/** Who may enter an application with their console session (§26, §38) — the rule itself is
+ *  oidcService.consoleAccess. */
+export function findPlatformApplication(applicationId: string) {
+	return prisma.application.findUnique({
+		where: { id: applicationId },
+		select: { id: true, organizationId: true, platformAccess: true }
 	});
 }
 
 /**
- * The console member `userId` if they are an Admin of the organization owning `applicationId`
- * (DECISIONS.md §26), else null. Checked at sign-in AND at every later use of a code or token, so
- * a member removed from the organization loses access to its applications at once.
+ * A console account and the organizations it is an Admin of. Read at sign-in AND at every later
+ * use of a code or token, so a member removed from an organization loses access at once.
  */
-export async function findApplicationAdmin(userId: string, applicationId: string) {
-	const membership = await prisma.membership.findFirst({
-		where: { userId, role: 'OWNER', organization: { applications: { some: { id: applicationId } } } },
-		select: { user: { select: { id: true, name: true, email: true, twoFactorEnabled: true } } }
+export function findConsoleAccount(userId: string) {
+	return prisma.user.findUnique({
+		where: { id: userId },
+		select: {
+			id: true,
+			name: true,
+			email: true,
+			role: true,
+			twoFactorEnabled: true,
+			disabledAt: true,
+			memberships: {
+				where: { role: 'OWNER' },
+				orderBy: { organization: { name: 'asc' } },
+				select: { organization: { select: { id: true, name: true } } }
+			}
+		}
 	});
-	return membership?.user ?? null;
 }
 
-/** Who a code / token was issued to: exactly one of the two is set (CHECK constraint). */
+/** Every organization (the superadmin may enter a tool for any of them, §38). */
+export function listOrganizations() {
+	return prisma.organization.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } });
+}
+
+/** The organizations a tool is enabled for (§38). */
+export async function findToolOrganizationIds(applicationId: string): Promise<Set<string>> {
+	const rows = await prisma.organizationTool.findMany({ where: { applicationId }, select: { organizationId: true } });
+	return new Set(rows.map((r) => r.organizationId));
+}
+
+/** Who a code / token was issued to: exactly one of the two is set (CHECK constraint) — and, for
+ *  a tool, the organization the member entered it for (§38). */
 const holderSelect = {
 	appUser: { select: { id: true, email: true, name: true, role: true, passwordHash: true, disabledAt: true } },
-	user: { select: { id: true, email: true, name: true } }
+	user: { select: { id: true, email: true, name: true } },
+	organizationId: true
 } as const;
 
 export function createAuthCode(data: {
@@ -66,6 +105,7 @@ export function createAuthCode(data: {
 	applicationId: string;
 	appUserId?: string;
 	userId?: string;
+	organizationId?: string;
 	redirectUri: string;
 	codeChallenge: string;
 	nonce: string | null;
@@ -105,6 +145,7 @@ export function createAccessToken(data: {
 	applicationId: string;
 	appUserId?: string;
 	userId?: string;
+	organizationId?: string;
 	scope: string;
 	expiresAt: Date;
 }) {

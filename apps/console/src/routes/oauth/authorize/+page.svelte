@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { Alert, Button, Input } from '@guillaumeg/ui';
-	import { LogIn, ShieldCheck } from '@lucide/svelte';
+	import { Building2, LogIn, ShieldCheck } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 
-	// Sign-in to a client's portal with the account of THAT application — or, for an Admin of its
-	// organization signed in to the console, with that session (§26). Plain form posts (no
+	// Sign-in to a client's portal with the account of THAT application — or, for a console member
+	// signed in who may enter it, with that session (§26), for one organization on a tool (§38).
+	// Plain form posts (no
 	// enhance): on success the answer redirects to the portal — another site — which the browser
 	// follows natively.
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -33,19 +34,36 @@
 
 			{#if form?.message}<Alert variant="error">{form.message}</Alert>{/if}
 
-			{#if data.admin}
-				{#if data.admin.twoFactorEnabled}
+			{#if data.member}
+				{@const member = data.member}
+				{#if !member.twoFactorEnabled}
+					<Alert variant="warning">
+						Pour entrer avec votre compte console, activez d'abord la double authentification dans la
+						<a href="/securite">console</a>.
+					</Alert>
+				{:else if member.organizations}
+					<!-- A tool: entered for ONE organization, never across them (§38). -->
+					{#if member.requestedUnavailable}
+						<Alert variant="info">Cet outil n'est pas activé pour l'organisation demandée.</Alert>
+					{/if}
+					<div class="form">
+						{#each member.organizations as organization (organization.id)}
+							<form method="POST" onsubmit={() => (busy = true)}>
+								<input type="hidden" name="as" value="admin" />
+								<input type="hidden" name="organization" value={organization.id} />
+								<Button addClass="w-full" icon={Building2} loading={busy} size="lg" type="submit">
+									Continuer pour {organization.name}
+								</Button>
+							</form>
+						{/each}
+					</div>
+				{:else}
 					<form method="POST" class="form" onsubmit={() => (busy = true)}>
 						<input type="hidden" name="as" value="admin" />
 						<Button addClass="w-full" icon={ShieldCheck} loading={busy} size="lg" type="submit">
-							Continuer en tant que {data.admin.name} (admin)
+							Continuer en tant que {member.name}{member.role === 'admin' ? ' (admin)' : ''}
 						</Button>
 					</form>
-				{:else}
-					<Alert variant="warning">
-						Pour entrer en tant qu'admin, activez d'abord la double authentification dans la
-						<a href="/securite">console</a>.
-					</Alert>
 				{/if}
 				<div class="separator">ou avec un compte utilisateur</div>
 			{/if}
@@ -65,7 +83,7 @@
 					loading={busy}
 					size="lg"
 					type="submit"
-					variant={data.admin ? 'outline' : 'primary'}
+					variant={data.member ? 'outline' : 'primary'}
 				>
 					Se connecter
 				</Button>

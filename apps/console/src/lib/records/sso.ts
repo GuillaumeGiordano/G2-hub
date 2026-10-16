@@ -3,13 +3,18 @@
 /** Every client secret starts with this prefix: a leaked secret is recognizable at a glance. */
 export const SSO_SECRET_PREFIX = 'g2_sso_';
 
-/** Scopes a portal may ask for: `openid` (required) → sub; `email` → email; `profile` → name. */
-export const SSO_SCOPES = ['openid', 'email', 'profile'] as const;
+/** Scopes a portal may ask for: `openid` (required) → sub; `email` → email; `profile` → name;
+ *  for an application of the platform (§38), `organization` → the organization a tool was entered
+ *  for, `organizations` → the organizations the console member is an Admin of. */
+export const SSO_SCOPES = ['openid', 'email', 'profile', 'organization', 'organizations'] as const;
 
-/** The `role` claim sent to the portal (DECISIONS.md §26): `admin` = an Admin of the application's
- *  organization (a console member), the others = the application user's role. */
+/** The `role` claim sent to the portal (DECISIONS.md §26, §38): `admin` = an Admin of the
+ *  organization OWNING the application (or the superadmin, on an application of the platform);
+ *  `client` = an Admin of another organization on an application of the platform; the others =
+ *  the application user's role. */
 export const SSO_ROLE_CLAIM = {
 	ADMIN: 'admin',
+	CLIENT: 'client',
 	SUPER_USER: 'superuser',
 	USER: 'user',
 	GUEST: 'guest'
@@ -18,6 +23,9 @@ export const SSO_ROLE_CLAIM = {
 /** `sub` of a console member: prefixed so that it never collides with an application user's id
  *  (those keep their bare id, so the portals already connected do not break). */
 export const MEMBER_SUBJECT_PREFIX = 'm_';
+
+/** Authorization parameter: the organization a console member enters a tool for (§38). */
+export const ORGANIZATION_PARAM = 'organization';
 
 /** Lifetimes, in seconds. */
 export const AUTH_CODE_TTL = 60;
