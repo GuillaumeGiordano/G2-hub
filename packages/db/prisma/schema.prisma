@@ -25,7 +25,10 @@ model Organization {
   slug           String   @unique
   /// Storage quota of the plan, in bytes — 1 GB, 5 GB or 20 GB (DECISIONS.md §10).
   quotaBytes     BigInt   @default(1073741824)
-  /// Offer: false = « Accès » (user management only), true = « Accès + Stockage » (§12).
+  /// Two independent offers (DECISIONS.md §12) — later carried by g2-erp's active contract. Auth:
+  /// the applications' users and « Se connecter avec G2 Hub »; Storage: folders and files. Without
+  /// any, the organization's Admins cannot open it.
+  authEnabled    Boolean  @default(true)
   storageEnabled Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

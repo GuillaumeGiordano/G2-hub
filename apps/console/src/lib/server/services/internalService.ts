@@ -14,7 +14,8 @@ export type InternalOrganization = {
 	id: string;
 	name: string;
 	slug: string;
-	/** « Accès » (false) or « Accès + Stockage » (true) — §12. */
+	/** The two independent offers — §12. */
+	authEnabled: boolean;
 	storageEnabled: boolean;
 	quotaBytes: number;
 	usedBytes: number;
@@ -31,6 +32,7 @@ function toInternal(row: BillingRow, usedBytes: bigint): InternalOrganization {
 		id: row.id,
 		name: row.name,
 		slug: row.slug,
+		authEnabled: row.authEnabled,
 		storageEnabled: row.storageEnabled,
 		quotaBytes: Number(row.quotaBytes),
 		usedBytes: Number(usedBytes),
@@ -63,7 +65,7 @@ export async function updatePlan(id: string, body: unknown): Promise<InternalOrg
 	const parsed = internalPlanSchema.safeParse(body);
 	if (!parsed.success) throw new HubError(firstIssue(parsed.error));
 	const current = await getOrganization(id);
-	const { quotaBytes, storageEnabled } = parsed.data;
+	const { quotaBytes, authEnabled, storageEnabled } = parsed.data;
 	if (quotaBytes !== undefined && quotaBytes < current.usedBytes) {
 		throw new HubError(
 			`L'organisation stocke déjà ${formatBytes(current.usedBytes)} : le palier ${formatBytes(quotaBytes)} est trop petit.`,
@@ -72,6 +74,7 @@ export async function updatePlan(id: string, body: unknown): Promise<InternalOrg
 	}
 	await orgRepo.updatePlan(id, {
 		...(quotaBytes !== undefined && { quotaBytes: BigInt(quotaBytes) }),
+		...(authEnabled !== undefined && { authEnabled }),
 		...(storageEnabled !== undefined && { storageEnabled })
 	});
 	return getOrganization(id);

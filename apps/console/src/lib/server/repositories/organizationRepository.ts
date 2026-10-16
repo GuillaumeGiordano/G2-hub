@@ -36,6 +36,7 @@ export function searchOrganizations(params: {
 			name: true,
 			slug: true,
 			quotaBytes: true,
+			authEnabled: true,
 			storageEnabled: true,
 			status: true,
 			// The superadmin is never counted among an organization's members (§34).
@@ -108,7 +109,7 @@ export async function findOrganizationIdOfApplication(applicationId: string) {
 export function findOrganizationById(id: string) {
 	return prisma.organization.findUnique({
 		where: { id },
-		select: { id: true, name: true, slug: true, quotaBytes: true, storageEnabled: true }
+		select: { id: true, name: true, slug: true, quotaBytes: true, authEnabled: true, storageEnabled: true }
 	});
 }
 
@@ -119,14 +120,14 @@ export async function slugTaken(slug: string, excludeId?: string): Promise<boole
 
 export function createOrganization(
 	tx: Prisma.TransactionClient,
-	data: { name: string; slug: string; quotaBytes: bigint; storageEnabled: boolean }
+	data: { name: string; slug: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean }
 ) {
 	return tx.organization.create({ data, select: { id: true, name: true } });
 }
 
 export function updateOrganization(
 	id: string,
-	data: { name: string; quotaBytes: bigint; storageEnabled: boolean }
+	data: { name: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean }
 ) {
 	return prisma.organization.update({ where: { id }, data, select: { name: true } });
 }
@@ -138,6 +139,7 @@ const billingSelect = {
 	name: true,
 	slug: true,
 	quotaBytes: true,
+	authEnabled: true,
 	storageEnabled: true,
 	createdAt: true,
 	_count: { select: { memberships: true, applications: true, appUsers: true } }
@@ -152,8 +154,8 @@ export function findOrganizationForBilling(id: string) {
 	return prisma.organization.findUnique({ where: { id }, select: billingSelect });
 }
 
-/** The plan only (tier + storage option) — what the portal changes after a payment. */
-export function updatePlan(id: string, data: { quotaBytes?: bigint; storageEnabled?: boolean }) {
+/** The plan only (tier + offers) — what the portal changes after a payment. */
+export function updatePlan(id: string, data: { quotaBytes?: bigint; authEnabled?: boolean; storageEnabled?: boolean }) {
 	return prisma.organization.update({ where: { id }, data, select: { id: true } });
 }
 

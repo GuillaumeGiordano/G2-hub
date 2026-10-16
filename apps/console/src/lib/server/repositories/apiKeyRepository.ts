@@ -44,7 +44,7 @@ export function findActiveKeyByHash(hash: string) {
 			organizationId: true,
 			applicationId: true,
 			application: { select: { allowedOrigins: true } },
-			organization: { select: { storageEnabled: true } }
+			organization: { select: { authEnabled: true, storageEnabled: true } }
 		}
 	});
 }

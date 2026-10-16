@@ -6,7 +6,7 @@ import * as fileRepo from '$lib/server/repositories/fileRepository';
 import { purgeObjects } from '$lib/server/storage/purge';
 import { appUserStatus, toAppUserListItem } from '$lib/server/mappers/appUserMapper';
 import { assertCan, type OrgContext } from '$lib/server/context';
-import { HubError, notFound } from '$lib/server/errors';
+import { forbidden, HubError, notFound } from '$lib/server/errors';
 import { hubUrl } from '$lib/server/instance';
 import { sendMail } from '$lib/server/mail/mailer';
 import { invitationMail, passwordResetMail } from '$lib/server/mail/templates';
@@ -108,12 +108,18 @@ function alreadyThere(active: boolean) {
 
 // ─── Console (active organization, ctx from the session — §13) ───────────────
 
+/** The users of the applications belong to the Auth offer (§12). */
+function assertAuthEnabled(ctx: OrgContext): void {
+	if (!ctx.organization.authEnabled) throw forbidden("L'offre Auth n'est pas activée pour cette organisation.");
+}
+
 export async function listAppUsers(
 	ctx: OrgContext,
 	applicationId: string,
 	params: { search?: string; page: number; perPage: number }
 ): Promise<{ items: AppUserListItem[]; total: number }> {
 	assertCan(ctx, 'read');
+	assertAuthEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const [rows, total] = await Promise.all([
 		userRepo.searchAppUsers({
@@ -133,6 +139,7 @@ export async function listAppUsers(
 
 export async function inviteAppUser(ctx: OrgContext, applicationId: string, input: InviteInput) {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	const app = await applicationOrThrow(ctx, applicationId);
 	return invite(
 		{ organizationId: ctx.organization.id, applicationId, applicationName: app.name, invitedById: ctx.userId },
@@ -150,6 +157,7 @@ async function appUserOrThrow(ctx: OrgContext, applicationId: string, id: string
 /** A new invitation link (the previous ones stop working). Returns the address it went to. */
 export async function resendInvitation(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	const app = await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	const status = appUserStatus(user);
@@ -178,6 +186,7 @@ export async function setAppUserDisabled(
 	disabled: boolean
 ): Promise<string> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	await userRepo.setDisabled(ctx.organization.id, applicationId, user.id, disabled ? new Date() : null);
@@ -201,6 +210,7 @@ export async function updateAppUser(
 	input: { name: string; email: string; role: AppUserRole }
 ): Promise<{ email: string; invitationRevoked: boolean }> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	const email = normalizeEmail(input.email);
@@ -223,6 +233,7 @@ export async function updateAppUser(
  *  keeps no portal session of its own: the portal gets a 401 and signs the user in again. */
 export async function revokeAppUserSessions(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	await userRepo.revokeGrants(user.id);
@@ -233,6 +244,7 @@ export async function revokeAppUserSessions(ctx: OrgContext, applicationId: stri
  *  sees nor sets a password; the current one keeps working until the user uses the link. */
 export async function sendAppUserPasswordReset(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	const app = await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	const status = appUserStatus(user);
@@ -262,6 +274,7 @@ async function sendPasswordResetLink(user: { id: string; name: string; email: st
 
 export async function deleteAppUser(ctx: OrgContext, applicationId: string, id: string): Promise<string> {
 	assertCan(ctx, 'appUsers.manage');
+	assertAuthEnabled(ctx);
 	await applicationOrThrow(ctx, applicationId);
 	const user = await appUserOrThrow(ctx, applicationId, id);
 	// The personal space's objects first (§28): the rows then go by cascade, freeing their bytes.

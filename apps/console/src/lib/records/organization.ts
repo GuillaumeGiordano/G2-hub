@@ -92,9 +92,26 @@ export const usageBadgeVariant: Record<UsageLevel, 'default' | 'warning' | 'dang
 	FULL: 'danger'
 };
 
-/** Offer label: storage is an option (DECISIONS.md §12). */
-export function offerLabel(storageEnabled: boolean): string {
-	return storageEnabled ? 'Accès + Stockage' : 'Accès';
+// ─── Offers (DECISIONS.md §12) ─────────────────────────────────────────────────
+
+/** Two independent offers — later carried by the active contract in g2-erp. An organization needs
+ *  at least one for its Admins to open it. */
+export const OFFERS = ['AUTH', 'STORAGE'] as const;
+export type Offer = (typeof OFFERS)[number];
+
+export const offerLabel: Record<Offer, string> = {
+	AUTH: 'Auth',
+	STORAGE: 'Stockage'
+};
+
+export const offerHint: Record<Offer, string> = {
+	AUTH: 'Utilisateurs des applications et « Se connecter avec G2 Hub » (back-office compris).',
+	STORAGE: 'Dossiers et fichiers des applications, avec le forfait de stockage.'
+};
+
+/** The offers an organization holds, in display order. */
+export function offersOf(org: { authEnabled: boolean; storageEnabled: boolean }): Offer[] {
+	return OFFERS.filter((o) => (o === 'AUTH' ? org.authEnabled : org.storageEnabled));
 }
 
 // ─── « Mon organisation » (DECISIONS.md §31) ───────────────────────────────────

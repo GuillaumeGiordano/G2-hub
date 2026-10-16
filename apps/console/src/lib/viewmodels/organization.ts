@@ -8,6 +8,8 @@ export type OrganizationListItem = {
 	quotaBytes: number;
 	/** Bytes counted toward the quota (all its applications). */
 	usedBytes: number;
+	/** The two independent offers (§12). */
+	authEnabled: boolean;
 	storageEnabled: boolean;
 	status: OrganizationStatus;
 	memberCount: number;
@@ -24,6 +26,8 @@ export type ActiveOrganization = {
 	name: string;
 	slug: string;
 	quotaBytes: number;
+	/** The two independent offers (§12). */
+	authEnabled: boolean;
 	storageEnabled: boolean;
 	/** The current user's role (null for the superadmin when not a member). */
 	role: OrgRole | null;
@@ -42,6 +46,8 @@ export type MyOrganization = {
 	id: string;
 	name: string;
 	slug: string;
+	/** The two independent offers (§12). */
+	authEnabled: boolean;
 	storageEnabled: boolean;
 	quotaBytes: number;
 	usedBytes: number;

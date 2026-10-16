@@ -59,7 +59,7 @@ async function freeSlug(name: string): Promise<string> {
  *  e-mail; if the e-mail cannot be sent, nothing is kept (organization and account removed). */
 export async function createOrganization(
 	actor: Actor,
-	input: { name: string; quotaBytes: number; storageEnabled: boolean; ownerName: string; ownerEmail: string }
+	input: { name: string; quotaBytes: number; authEnabled: boolean; storageEnabled: boolean; ownerName: string; ownerEmail: string }
 ): Promise<CreatedOrganization> {
 	if (!actor.isSuperadmin) throw forbidden();
 	const slug = await freeSlug(input.name);
@@ -69,6 +69,7 @@ export async function createOrganization(
 			name: input.name,
 			slug,
 			quotaBytes: BigInt(input.quotaBytes),
+			authEnabled: input.authEnabled,
 			storageEnabled: input.storageEnabled
 		});
 		const owner = await ensureAccount({ name: input.ownerName, email: ownerEmail }, tx);
@@ -90,13 +91,14 @@ export async function createOrganization(
 export async function updateOrganization(
 	actor: Actor,
 	id: string,
-	input: { name: string; quotaBytes: number; storageEnabled: boolean }
+	input: { name: string; quotaBytes: number; authEnabled: boolean; storageEnabled: boolean }
 ): Promise<string> {
 	if (!actor.isSuperadmin) throw forbidden();
 	if (!(await orgRepo.findOrganizationById(id))) throw notFound('Organisation introuvable.');
 	const org = await orgRepo.updateOrganization(id, {
 		name: input.name,
 		quotaBytes: BigInt(input.quotaBytes),
+		authEnabled: input.authEnabled,
 		storageEnabled: input.storageEnabled
 	});
 	return org.name;
@@ -141,6 +143,7 @@ export async function getMyOrganization(ctx: OrgContext): Promise<MyOrganization
 		id: org.id,
 		name: org.name,
 		slug: org.slug,
+		authEnabled: org.authEnabled,
 		storageEnabled: org.storageEnabled,
 		quotaBytes: org.quotaBytes,
 		usedBytes: Number(used.get(org.id) ?? 0n),

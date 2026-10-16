@@ -100,6 +100,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (routeId.startsWith(ORGANIZATION_ROUTE) && !event.locals.organization) {
 			error(404, 'Organisation introuvable.');
 		}
+		// Without any offer its Admins cannot open it; the superadmin still does (§12).
+		const org = event.locals.organization;
+		if (routeId.startsWith(ORGANIZATION_ROUTE) && org && !org.authEnabled && !org.storageEnabled && !event.locals.orgContext?.isSuperadmin) {
+			error(403, 'Aucune offre active pour cette organisation : contactez votre prestataire.');
+		}
 	}
 
 	return resolve(event);

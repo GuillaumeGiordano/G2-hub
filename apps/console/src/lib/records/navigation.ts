@@ -108,13 +108,13 @@ export function resolveNavItem(item: NavItem, ctx: NavContext): { label: string;
 	};
 }
 
-/** Tabs of one application's pages (« Fichiers » and « Utilisateurs » for every member; « Clés
- *  API » and « Connexion » only for those who manage applications). */
-export function applicationTabs(organizationId: string, applicationId: string, canManage: boolean) {
+/** Tabs of one application's pages (« Fichiers » and « Utilisateurs » — with the Auth offer, §12 —
+ *  for every member; « Clés API » and « Connexion » only for those who manage applications). */
+export function applicationTabs(organizationId: string, applicationId: string, canManage: boolean, authEnabled: boolean) {
 	const base = orgPath(organizationId, `/applications/${applicationId}`);
 	return [
 		{ label: 'Fichiers', href: base },
-		{ label: 'Utilisateurs', href: `${base}/utilisateurs` },
+		...(authEnabled ? [{ label: 'Utilisateurs', href: `${base}/utilisateurs` }] : []),
 		...(canManage
 			? [
 					{ label: 'Clés API', href: `${base}/cles` },

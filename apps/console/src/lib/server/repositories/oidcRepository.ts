@@ -44,7 +44,8 @@ export function findSsoClient(applicationId: string) {
 			organizationId: true,
 			platformAccess: true,
 			ssoSecretHash: true,
-			ssoRedirectUris: true
+			ssoRedirectUris: true,
+			organization: { select: { authEnabled: true } }
 		}
 	});
 }
@@ -54,7 +55,7 @@ export function findSsoClient(applicationId: string) {
 export function findPlatformApplication(applicationId: string) {
 	return prisma.application.findUnique({
 		where: { id: applicationId },
-		select: { id: true, organizationId: true, platformAccess: true }
+		select: { id: true, organizationId: true, platformAccess: true, organization: { select: { authEnabled: true } } }
 	});
 }
 

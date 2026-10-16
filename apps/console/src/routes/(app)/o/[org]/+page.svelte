@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { Badge, Button, Card, EmptyState } from '@guillaumeg/ui';
+	import { Button, Card, EmptyState } from '@guillaumeg/ui';
 	import { AppWindow, Building2, Users } from '@lucide/svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { orgPath } from '$lib/utils/orgPath';
 	import StorageOverview from '$lib/components/storage/StorageOverview.svelte';
-	import { formatBytes, offerLabel, orgRoleLabel } from '$lib/records/organization';
+	import OfferBadges from '$lib/components/OfferBadges.svelte';
+	import { formatBytes, orgRoleLabel } from '$lib/records/organization';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,8 +23,8 @@
 			{/snippet}
 			<dl class="facts">
 				<div>
-					<dt>Offre</dt>
-					<dd><Badge label={offerLabel(org.storageEnabled)} variant={org.storageEnabled ? 'primary' : 'default'} /></dd>
+					<dt>Offres</dt>
+					<dd><OfferBadges organization={org} /></dd>
 				</div>
 				<div>
 					<dt>Forfait de stockage</dt>

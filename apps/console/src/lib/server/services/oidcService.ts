@@ -53,7 +53,7 @@ export class OAuthError extends Error {
 // ─── 1. Authorization request ────────────────────────────────────────────────
 
 export type AuthorizeRequest = {
-	application: { id: string; name: string; organizationId: string; platformAccess: PlatformAccess };
+	application: { id: string; name: string; organizationId: string; platformAccess: PlatformAccess; authEnabled: boolean };
 	/** The organization a console member enters a TOOL for (§38), as the tool asked — checked later. */
 	organizationId: string | null;
 	redirectUri: string;
@@ -86,7 +86,10 @@ const PKCE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 export async function checkAuthorizeRequest(params: URLSearchParams): Promise<AuthorizeCheck> {
 	const clientId = params.get('client_id') ?? '';
 	const client = clientId ? await oidcRepo.findSsoClient(clientId) : null;
-	if (!client) return { kind: 'fatal', message: "Cette application n'existe pas ou n'accepte pas la connexion avec G2 Hub." };
+	// A client's application needs its organization's Auth offer (§12); the platform's do not.
+	if (!client || (client.platformAccess === 'NONE' && !client.organization.authEnabled)) {
+		return { kind: 'fatal', message: "Cette application n'existe pas ou n'accepte pas la connexion avec G2 Hub." };
+	}
 	const redirectUri = params.get('redirect_uri') ?? '';
 	if (!client.ssoRedirectUris.includes(redirectUri)) {
 		return { kind: 'fatal', message: "L'adresse de retour demandée n'est pas autorisée pour cette application." };
@@ -115,7 +118,8 @@ export async function checkAuthorizeRequest(params: URLSearchParams): Promise<Au
 				id: client.id,
 				name: client.name,
 				organizationId: client.organizationId,
-				platformAccess: client.platformAccess
+				platformAccess: client.platformAccess,
+				authEnabled: client.organization.authEnabled
 			},
 			organizationId: params.get(ORGANIZATION_PARAM) || null,
 			redirectUri,
@@ -161,6 +165,8 @@ export type SignInResult = { ok: true; location: string } | { ok: false; message
 export async function signIn(request: AuthorizeRequest, email: string, password: string): Promise<SignInResult> {
 	const normalized = email.trim().toLowerCase();
 	const key = `${request.application.id}:${normalized}`;
+	// Application users belong to the Auth offer of the organization owning the application (§12).
+	if (!request.application.authEnabled) return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
 	if (tooManyFailures(key)) return { ok: false, message: 'Trop de tentatives. Réessayez dans quelques minutes.' };
 
 	const user = await userRepo.findAppUserByEmail(request.application.id, normalized);
@@ -203,7 +209,7 @@ type ConsoleGrant = {
  */
 async function consoleGrant(
 	account: ConsoleAccount,
-	application: { id: string; organizationId: string; platformAccess: PlatformAccess }
+	application: { id: string; organizationId: string; platformAccess: PlatformAccess; authEnabled: boolean }
 ): Promise<ConsoleGrant | null> {
 	if (account.disabledAt) return null;
 	const superadmin = isSuperadmin(account.role);
@@ -213,7 +219,8 @@ async function consoleGrant(
 
 	switch (application.platformAccess) {
 		case 'NONE':
-			return owner ? { role: SSO_ROLE_CLAIM.ADMIN, organizations: null } : null;
+			// Without the Auth offer, no back-office through the hub either (§12).
+			return owner && application.authEnabled ? { role: SSO_ROLE_CLAIM.ADMIN, organizations: null } : null;
 		case 'ALL_ADMINS':
 			return superadmin || organizations.length ? { role, organizations: null } : null;
 		case 'PER_ORGANIZATION': {
@@ -410,9 +417,12 @@ type HolderRow = {
  * at once (§26, §38).
  */
 async function activeHolder(row: HolderRow, applicationId: string): Promise<Holder | null> {
+	const found = await oidcRepo.findPlatformApplication(applicationId);
+	if (!found) return null;
+	const application = { ...found, authEnabled: found.organization.authEnabled };
 	if (row.appUser) {
 		const u = row.appUser;
-		if (u.disabledAt || !u.passwordHash) return null;
+		if (u.disabledAt || !u.passwordHash || !application.authEnabled) return null;
 		return {
 			sub: u.id,
 			email: u.email,
@@ -424,12 +434,9 @@ async function activeHolder(row: HolderRow, applicationId: string): Promise<Hold
 		};
 	}
 	if (!row.user) return null;
-	const [account, application] = await Promise.all([
-		oidcRepo.findConsoleAccount(row.user.id),
-		oidcRepo.findPlatformApplication(applicationId)
-	]);
-	const grant = account && application && (await consoleGrant(account, application));
-	if (!account || !application || !grant) return null;
+	const account = await oidcRepo.findConsoleAccount(row.user.id);
+	const grant = account && (await consoleGrant(account, application));
+	if (!account || !grant) return null;
 
 	let organization: Organization | null = null;
 	if (grant.organizations) {

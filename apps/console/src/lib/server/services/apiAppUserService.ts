@@ -10,6 +10,7 @@ import { invite, type InvitedAppUser } from './appUserService';
 /** POST /api/v1/users — invite someone: the account is created and the invitation e-mailed. */
 export async function inviteUser(ctx: ApiContext, body: unknown): Promise<InvitedAppUser> {
 	requireSecret(ctx);
+	if (!ctx.authEnabled) throw new ApiError(403, "L'offre Auth n'est pas activée pour cette organisation.");
 	const parsed = appUserInviteSchema.safeParse(body);
 	if (!parsed.success) throw new ApiError(400, firstIssue(parsed.error));
 	const app = await userRepo.findApplicationName(ctx.applicationId);

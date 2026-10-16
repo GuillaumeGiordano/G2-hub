@@ -12,6 +12,8 @@ export type ApiContext = {
 	kind: ApiKeyKind;
 	organizationId: string;
 	applicationId: string;
+	/** The organization's offers (§12): users need Auth, files need Storage. */
+	authEnabled: boolean;
 	storageEnabled: boolean;
 	/** The signed-in application user, from `X-G2-User-Token` (their « Se connecter avec G2 Hub »
 	 *  access token) — the second proof of the personal-space routes (§28). null without it. */
@@ -97,6 +99,7 @@ export async function authenticate(request: Request, url: URL): Promise<ApiConte
 		kind: row.kind,
 		organizationId: row.organizationId,
 		applicationId: row.applicationId,
+		authEnabled: row.organization.authEnabled,
 		storageEnabled: row.organization.storageEnabled,
 		appUserId,
 		corsOrigin: allowed ? origin : null

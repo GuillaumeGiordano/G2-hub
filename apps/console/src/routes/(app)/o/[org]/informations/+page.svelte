@@ -9,7 +9,6 @@
 	import {
 		formatBytes,
 		LOGO_TYPES,
-		offerLabel,
 		organizationStatusLabel,
 		organizationStatusOptions,
 		organizationStatusVariant,
@@ -19,6 +18,7 @@
 		usageLevelColor,
 		usagePercent
 	} from '$lib/records/organization';
+	import OfferBadges from '$lib/components/OfferBadges.svelte';
 	import { organizationProfileSchema, organizationStatusSchema } from '$lib/schemas/organizationProfile';
 	import { FieldErrors } from '$lib/utils/fieldErrors.svelte';
 	import { toastEnhance } from '$lib/utils/toastEnhance';
@@ -95,8 +95,8 @@
 			{/snippet}
 			<dl class="facts">
 				<div>
-					<dt>Offre</dt>
-					<dd><Badge label={offerLabel(org.storageEnabled)} variant={org.storageEnabled ? 'primary' : 'default'} /></dd>
+					<dt>Offres</dt>
+					<dd><OfferBadges organization={org} /></dd>
 				</div>
 				{#if org.storageEnabled}
 					<div>

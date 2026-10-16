@@ -18,12 +18,13 @@
 		Table
 	} from '@guillaumeg/ui';
 	import { ArrowRight, EllipsisVertical, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import OfferBadges from '$lib/components/OfferBadges.svelte';
 	import SuperTitle from '$lib/components/SuperTitle.svelte';
 	import { PER_PAGE_OPTIONS } from '$lib/constants';
 	import {
 		DEFAULT_QUOTA_BYTES,
 		formatBytes,
-		offerLabel,
+		offerHint,
 		organizationStatusLabel,
 		organizationStatusVariant,
 		quotaOptions,
@@ -52,9 +53,10 @@
 	let editing = $state<OrganizationListItem | null>(null);
 	let fName = $state('');
 	let fQuota = $state(String(DEFAULT_QUOTA_BYTES));
+	let fAuth = $state(true);
 	let fStorage = $state(true);
 	const formErrors = new FieldErrors(
-		['name', 'quotaBytes', 'ownerName', 'ownerEmail'],
+		['name', 'quotaBytes', 'authEnabled', 'ownerName', 'ownerEmail'],
 		() => (editing ? organizationUpdateSchema : organizationCreateSchema)
 	);
 
@@ -82,6 +84,7 @@
 		editing = null;
 		fName = '';
 		fQuota = String(DEFAULT_QUOTA_BYTES);
+		fAuth = true;
 		fStorage = true;
 		formErrors.clear();
 		modal(FORM_MODAL_ID)?.showModal();
@@ -91,6 +94,7 @@
 		editing = org;
 		fName = org.name;
 		fQuota = String(org.quotaBytes);
+		fAuth = org.authEnabled;
 		fStorage = org.storageEnabled;
 		formErrors.clear();
 		modal(FORM_MODAL_ID)?.showModal();
@@ -121,7 +125,7 @@
 {/snippet}
 
 {#snippet offerCell(org: OrganizationListItem)}
-	<Badge label={offerLabel(org.storageEnabled)} variant={org.storageEnabled ? 'primary' : 'default'} />
+	<OfferBadges organization={org} />
 {/snippet}
 
 {#snippet quotaCell(org: OrganizationListItem)}
@@ -238,7 +242,10 @@
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input bind:value={fName} error={formErrors.get('name')} label="Nom" name="name" required />
 
-		<Switch bind:checked={fStorage} label="Option stockage (offre « Accès + Stockage »)" />
+		<div class="section-title">Offres</div>
+		<Switch bind:checked={fAuth} label="Auth" hint={offerHint.AUTH} error={formErrors.get('authEnabled')} />
+		<input type="hidden" name="authEnabled" value={fAuth ? 'on' : ''} />
+		<Switch bind:checked={fStorage} label="Stockage" hint={offerHint.STORAGE} />
 		<input type="hidden" name="storageEnabled" value={fStorage ? 'on' : ''} />
 		<Select
 			bind:value={fQuota}

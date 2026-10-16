@@ -61,7 +61,7 @@
 	const b = $derived(data.browser);
 	const base = $derived(orgPath(page.params.org!, `/applications/${b.application.id}`));
 	const folderHref = (id: string) => `${base}?dossier=${id}`;
-	const tabs = $derived(applicationTabs(page.params.org!, b.application.id, data.canManageKeys));
+	const tabs = $derived(applicationTabs(page.params.org!, b.application.id, data.canManageKeys, page.data.organization?.authEnabled ?? false));
 
 	const crumbs = $derived([
 		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },

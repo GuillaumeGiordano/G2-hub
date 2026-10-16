@@ -6,6 +6,7 @@ type OrganizationRow = {
 	name: string;
 	slug: string;
 	quotaBytes: bigint;
+	authEnabled: boolean;
 	storageEnabled: boolean;
 };
 
@@ -23,6 +24,7 @@ export function toOrganizationListItem(row: OrganizationListRow, usedBytes: bigi
 		// BigInt does not serialize to the page; a quota (≤ 20 GB) fits a JS number exactly.
 		quotaBytes: Number(row.quotaBytes),
 		usedBytes: Number(usedBytes),
+		authEnabled: row.authEnabled,
 		storageEnabled: row.storageEnabled,
 		status: row.status,
 		memberCount: row._count.memberships,
@@ -38,6 +40,7 @@ export function toActiveOrganization(row: OrganizationRow, role: OrgRole | null)
 		name: row.name,
 		slug: row.slug,
 		quotaBytes: Number(row.quotaBytes),
+		authEnabled: row.authEnabled,
 		storageEnabled: row.storageEnabled,
 		role
 	};
