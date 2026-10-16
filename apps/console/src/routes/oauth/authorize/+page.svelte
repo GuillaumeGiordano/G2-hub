@@ -52,7 +52,7 @@
 								<input type="hidden" name="as" value="admin" />
 								<input type="hidden" name="organization" value={organization.id} />
 								<Button addClass="w-full" icon={Building2} loading={busy} size="lg" type="submit">
-									Continuer pour {organization.name}
+									Connexion avec {organization.name}
 								</Button>
 							</form>
 						{/each}
