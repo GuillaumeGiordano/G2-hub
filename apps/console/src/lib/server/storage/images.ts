@@ -14,10 +14,19 @@ export type ProcessedImage = {
 	height: number;
 };
 
+/** What sharp may decode, from the CONTENT (`metadata().format`; AVIF reads as `heif`): never an
+ *  SVG — a text format that can reference other files — nor any other format it supports. */
+const IMAGE_FORMATS = ['jpeg', 'png', 'webp', 'gif', 'heif'];
+
+function assertImageFormat(format: string | undefined): void {
+	if (!format || !IMAGE_FORMATS.includes(format)) throw new Error('Format d’image non accepté.');
+}
+
 export async function processImage(input: Uint8Array): Promise<ProcessedImage[]> {
 	// `animated`: an animated GIF / WebP stays animated.
 	const source = sharp(input, { animated: true, failOn: 'error' });
 	const meta = await source.metadata();
+	assertImageFormat(meta.format);
 	if (!meta.width || !meta.height) throw new Error('Image illisible.');
 
 	const out: ProcessedImage[] = [];
@@ -35,6 +44,7 @@ export async function processImage(input: Uint8Array): Promise<ProcessedImage[]>
 
 /** An organization's logo: fits in 512 × 512, never upscaled, transparent background kept. */
 export async function processLogo(input: Uint8Array): Promise<Uint8Array> {
+	assertImageFormat((await sharp(input).metadata()).format);
 	const data = await sharp(input, { failOn: 'error' })
 		.rotate()
 		.resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
