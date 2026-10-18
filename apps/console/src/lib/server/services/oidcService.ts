@@ -20,6 +20,7 @@ import type { AppUserRole } from '$lib/records/appUsers';
 import type { SignInOutcome } from '$lib/records/signIns';
 import type { SignInClient } from '$lib/viewmodels/signIn';
 import { recordSignIn } from './signInLogService';
+import { allowHit, SIGN_IN_PER_IP } from '$lib/server/rateLimit';
 
 // « Se connecter avec G2 Hub » — the OpenID Connect provider (DECISIONS.md §25). Only the
 // Authorization Code flow with PKCE, for portals that have a server (confidential clients):
@@ -177,6 +178,11 @@ export async function signIn(
 	const key = `${request.application.id}:${normalized}`;
 	// Application users belong to the Auth offer of the organization owning the application (§12).
 	if (!request.application.authEnabled) return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
+	// Per IP address too (§41): the per-address limit below cannot stop one password tried on many
+	// addresses. Not logged: a flood would otherwise fill the sign-in log.
+	if (!allowHit(client.ipAddress && `sign-in:${client.ipAddress}`, SIGN_IN_PER_IP.max, SIGN_IN_PER_IP.windowMs)) {
+		return { ok: false, message: 'Trop de tentatives. Réessayez dans quelques minutes.' };
+	}
 	const log = (outcome: SignInOutcome, appUserId: string | null = null) =>
 		recordSignIn({
 			organizationId: request.application.organizationId,

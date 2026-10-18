@@ -3,6 +3,7 @@ import { parseForm } from '$lib/validation';
 import { passwordForgotSchema } from '$lib/schemas/appUser';
 import { actionFailure, loadFailure } from '$lib/server/http';
 import * as appUserService from '$lib/server/services/appUserService';
+import { clientOf } from '$lib/server/services/signInLogService';
 import type { Actions, PageServerLoad } from './$types';
 
 // « Mot de passe oublié » of an APPLICATION user (portal end user, DECISIONS.md §24). The portal (or
@@ -19,14 +20,15 @@ export const load: PageServerLoad = async ({ url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, url }) => {
+	default: async (event) => {
+		const { request, url } = event;
 		const parsed = parseForm(await request.formData(), passwordForgotSchema);
 		if (!parsed.success) return fail(400, { errors: parsed.errors });
 		const appId = url.searchParams.get('app');
 		if (!appId) return fail(404, { message: 'Application introuvable.' });
 		// Same answer whether the address has an account or not (the service sends only if it does).
 		try {
-			await appUserService.requestPasswordReset(appId, parsed.data.email);
+			await appUserService.requestPasswordReset(appId, parsed.data.email, clientOf(event));
 			return { sent: true };
 		} catch (err) {
 			return actionFailure(err);

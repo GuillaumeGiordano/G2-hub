@@ -21,6 +21,7 @@ import {
 import type { AppUserListItem, AppUserUsage, PasswordLink } from '$lib/viewmodels/appUser';
 import type { SignInClient } from '$lib/viewmodels/signIn';
 import { recordSignIn } from './signInLogService';
+import { allowHit, RESET_PER_IP } from '$lib/server/rateLimit';
 import { applicationOrThrow } from './folderService';
 
 // Application users — the people who sign in to a client's PORTAL (DECISIONS.md §24). Their account
@@ -361,8 +362,10 @@ export async function publicApplication(applicationId: string): Promise<{ id: st
  * « Mot de passe oublié ». Always answers the same way, whether the address has an account or not,
  * and sends in the background: neither the answer nor its timing reveals who is registered.
  */
-export async function requestPasswordReset(applicationId: string, email: string): Promise<void> {
+export async function requestPasswordReset(applicationId: string, email: string, client: SignInClient): Promise<void> {
 	const app = await publicApplication(applicationId);
+	// Per IP address (§41): no flood of reset e-mails. Silent, like every other refusal here.
+	if (!allowHit(client.ipAddress && `reset:${client.ipAddress}`, RESET_PER_IP.max, RESET_PER_IP.windowMs)) return;
 	const user = await userRepo.findAppUserByEmail(app.id, normalizeEmail(email));
 	if (!user || appUserStatus(user) !== 'ACTIVE') return;
 	if (await userRepo.sentTokenSince(user.id, 'PASSWORD_RESET', new Date(Date.now() - RESET_THROTTLE_MS))) return;
