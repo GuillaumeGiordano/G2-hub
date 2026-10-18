@@ -1,4 +1,5 @@
 import { error, redirect, type Handle, type ServerInit } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import { auth } from '$lib/server/auth';
 import { isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
 import {
@@ -47,7 +48,37 @@ function crossSiteForm(request: Request, url: URL): boolean {
 	return request.headers.get('origin') !== url.origin && !CSRF_EXEMPT.has(url.pathname);
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+/**
+ * Security headers on EVERY answer (§41), unless a route set its own:
+ * - never inside a frame of another site (clickjacking: a hidden console under a fake button);
+ * - the declared content type is the real one (no « sniffing » of an upload into HTML);
+ * - the full address of a page (ids, tokens) never leaves for another site in the Referer;
+ * - https only, for a year (production: the dev server is plain http).
+ */
+const SECURITY_HEADERS: [string, string][] = [
+	['x-frame-options', 'DENY'],
+	['content-security-policy', "frame-ancestors 'none'"],
+	['x-content-type-options', 'nosniff'],
+	['referrer-policy', 'strict-origin-when-cross-origin'],
+	...(dev ? [] : ([['strict-transport-security', 'max-age=31536000; includeSubDomains']] as [string, string][]))
+];
+
+function withSecurityHeaders(response: Response): Response {
+	try {
+		for (const [name, value] of SECURITY_HEADERS) if (!response.headers.has(name)) response.headers.set(name, value);
+		return response;
+	} catch {
+		// Immutable headers (a response passed through as is): copy it once.
+		const copy = new Response(response.body, response);
+		for (const [name, value] of SECURITY_HEADERS) if (!copy.headers.has(name)) copy.headers.set(name, value);
+		return copy;
+	}
+}
+
+export const handle: Handle = async (input) => withSecurityHeaders(await guard(input));
+
+/** Authentication and authorization of a request — see the comments above. */
+const guard: Handle = async ({ event, resolve }) => {
 	if (crossSiteForm(event.request, event.url)) {
 		return new Response(`Cross-site ${event.request.method} form submissions are forbidden`, { status: 403 });
 	}
