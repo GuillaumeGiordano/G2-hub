@@ -7,11 +7,20 @@ import { authenticateInternal, InternalApiError } from './auth';
 
 const NO_STORE = { 'cache-control': 'no-store' };
 
-export function internalRoute(run: (event: RequestEvent) => Promise<unknown>): RequestHandler {
+/** `withStatus`: `run` answers `{ status, body }` (e.g. 201 for a creation) instead of the body. */
+export function internalRoute(
+	run: (event: RequestEvent) => Promise<unknown>,
+	options: { withStatus?: boolean } = {}
+): RequestHandler {
 	return async (event) => {
 		try {
 			authenticateInternal(event.request);
-			return json(await run(event), { headers: NO_STORE });
+			const result = await run(event);
+			if (options.withStatus) {
+				const { status, body } = result as { status: number; body: unknown };
+				return json(body, { status, headers: NO_STORE });
+			}
+			return json(result, { headers: NO_STORE });
 		} catch (err) {
 			if (err instanceof InternalApiError || err instanceof HubError) {
 				return json({ error: { status: err.status, message: err.message } }, { status: err.status, headers: NO_STORE });

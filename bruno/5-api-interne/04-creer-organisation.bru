@@ -1,0 +1,38 @@
+meta {
+  name: Créer une organisation (g2-erp)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{hubUrl}}/api/internal/v1/organizations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{internalToken}}
+}
+
+body:json {
+  {
+    "name": "Client Bruno",
+    "ownerName": "Admin Bruno",
+    "ownerEmail": "admin.bruno@example.test",
+    "externalRef": "bruno:client:1"
+  }
+}
+
+tests {
+  test("201 the first time, 200 when the reference exists", function () {
+    expect([200, 201]).to.include(res.status);
+    expect(res.body.organization.id).to.be.a("string");
+    expect(res.body.owner.sub).to.match(/^m_/);
+  });
+}
+
+docs {
+  g2-erp creates a won client's organization and its first Admin (DECISIONS.md §43). Run it again:
+  same externalRef → 200, created false, no new invitation. Delete « Client Bruno » in the console
+  afterwards.
+}

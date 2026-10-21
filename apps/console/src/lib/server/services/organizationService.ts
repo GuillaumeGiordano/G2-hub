@@ -55,33 +55,48 @@ async function freeSlug(name: string): Promise<string> {
 	return slug;
 }
 
-/** Create an organization and its first owner — superadmin only. A new owner account is invited by
- *  e-mail; if the e-mail cannot be sent, nothing is kept (organization and account removed). */
-export async function createOrganization(
-	actor: Actor,
-	input: {
-		name: string;
-		quotaBytes: number;
-		authEnabled: boolean;
-		storageEnabled: boolean;
-		maxAppUsers: number;
-		ownerName: string;
-		ownerEmail: string;
-	}
-): Promise<CreatedOrganization> {
+export type NewOrganizationInput = {
+	name: string;
+	quotaBytes: number;
+	authEnabled: boolean;
+	storageEnabled: boolean;
+	maxAppUsers: number;
+	ownerName: string;
+	ownerEmail: string;
+	/** g2-erp's reference (internal API, §43). */
+	externalRef?: string;
+};
+
+/** Create an organization and its first owner — superadmin only. */
+export async function createOrganization(actor: Actor, input: NewOrganizationInput): Promise<CreatedOrganization> {
 	if (!actor.isSuperadmin) throw forbidden();
+	const { name, ownerEmail, invited } = await createOrganizationWithOwner(input);
+	return { name, ownerEmail, invited };
+}
+
+/**
+ * The creation itself, for the console (superadmin) and the internal API (instance token). A new
+ * owner account is invited by e-mail; if the e-mail cannot be sent, nothing is kept (organization
+ * and account removed). An existing account simply becomes an Admin of the new organization — never
+ * a superadmin's (it would hold two roles).
+ */
+export async function createOrganizationWithOwner(input: NewOrganizationInput) {
 	const slug = await freeSlug(input.name);
 	const ownerEmail = input.ownerEmail.trim().toLowerCase();
 	const { org, owner } = await prisma.$transaction(async (tx) => {
+		const owner = await ensureAccount({ name: input.ownerName, email: ownerEmail }, tx);
+		if ((await userRepo.findUserRole(owner.userId, tx))?.role === 'superadmin') {
+			throw new HubError('Ce compte est un superadmin.', { field: 'ownerEmail' });
+		}
 		const org = await orgRepo.createOrganization(tx, {
 			name: input.name,
 			slug,
 			quotaBytes: BigInt(input.quotaBytes),
 			authEnabled: input.authEnabled,
 			storageEnabled: input.storageEnabled,
-			maxAppUsers: input.maxAppUsers
+			maxAppUsers: input.maxAppUsers,
+			externalRef: input.externalRef
 		});
-		const owner = await ensureAccount({ name: input.ownerName, email: ownerEmail }, tx);
 		await membershipRepo.createMembership({ organizationId: org.id, userId: owner.userId, role: 'OWNER' }, tx);
 		return { org, owner };
 	});
@@ -94,7 +109,7 @@ export async function createOrganization(
 			throw err;
 		}
 	}
-	return { name: org.name, ownerEmail, invited: owner.created };
+	return { id: org.id, name: org.name, ownerUserId: owner.userId, ownerEmail, invited: owner.created };
 }
 
 export async function updateOrganization(

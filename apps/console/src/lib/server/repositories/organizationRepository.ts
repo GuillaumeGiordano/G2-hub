@@ -121,7 +121,15 @@ export async function slugTaken(slug: string, excludeId?: string): Promise<boole
 
 export function createOrganization(
 	tx: Prisma.TransactionClient,
-	data: { name: string; slug: string; quotaBytes: bigint; authEnabled: boolean; storageEnabled: boolean; maxAppUsers: number }
+	data: {
+		name: string;
+		slug: string;
+		quotaBytes: bigint;
+		authEnabled: boolean;
+		storageEnabled: boolean;
+		maxAppUsers: number;
+		externalRef?: string;
+	}
 ) {
 	return tx.organization.create({ data, select: { id: true, name: true } });
 }
@@ -154,6 +162,11 @@ export function listOrganizationsForBilling() {
 
 export function findOrganizationForBilling(id: string) {
 	return prisma.organization.findUnique({ where: { id }, select: billingSelect });
+}
+
+/** The organization g2-erp created with this reference, if any (§43). */
+export function findOrganizationIdByExternalRef(externalRef: string) {
+	return prisma.organization.findUnique({ where: { externalRef }, select: { id: true } });
 }
 
 /** The plan only (tier + offers) — what the portal changes after a payment. */

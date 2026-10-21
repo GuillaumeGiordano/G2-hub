@@ -40,6 +40,9 @@ model Organization {
   logoKey String?
   /// SUSPENDED is informative for now (nothing blocked); later driven by g2-erp's active contract.
   status  OrganizationStatus @default(ACTIVE)
+  /// Set when g2-erp created it through the internal API (e.g. `g2-erp:client:<id>`): creating
+  /// again with the same reference returns this organization instead of a duplicate (§43).
+  externalRef String? @unique
 
   memberships      Membership[]
   applications     Application[]
