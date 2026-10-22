@@ -110,25 +110,29 @@ export async function createOrganization(
 }
 
 /**
- * PATCH /api/internal/v1/organizations/:id — change the plan. A tier below what is already stored is
- * refused (409): it would silently block every upload; the client deletes files first (§10).
+ * PATCH /api/internal/v1/organizations/:id — rename (§44) and / or change the plan. A tier below
+ * what is already stored is refused (409): it would silently block every upload; the client
+ * deletes files first (§10).
  */
 export async function updatePlan(id: string, body: unknown): Promise<InternalOrganization> {
 	const parsed = internalPlanSchema.safeParse(body);
 	if (!parsed.success) throw new HubError(firstIssue(parsed.error));
 	const current = await getOrganization(id);
-	const { quotaBytes, authEnabled, storageEnabled, maxAppUsers } = parsed.data;
+	const { name, quotaBytes, authEnabled, storageEnabled, maxAppUsers } = parsed.data;
 	if (quotaBytes !== undefined && quotaBytes < current.usedBytes) {
 		throw new HubError(
 			`L'organisation stocke déjà ${formatBytes(current.usedBytes)} : le palier ${formatBytes(quotaBytes)} est trop petit.`,
 			{ status: 409 }
 		);
 	}
-	await orgRepo.updatePlan(id, {
-		...(quotaBytes !== undefined && { quotaBytes: BigInt(quotaBytes) }),
-		...(authEnabled !== undefined && { authEnabled }),
-		...(storageEnabled !== undefined && { storageEnabled }),
-		...(maxAppUsers !== undefined && { maxAppUsers })
-	});
+	if (name !== undefined) await orgRepo.updateOrganizationName(id, name);
+	if (quotaBytes !== undefined || authEnabled !== undefined || storageEnabled !== undefined || maxAppUsers !== undefined) {
+		await orgRepo.updatePlan(id, {
+			...(quotaBytes !== undefined && { quotaBytes: BigInt(quotaBytes) }),
+			...(authEnabled !== undefined && { authEnabled }),
+			...(storageEnabled !== undefined && { storageEnabled }),
+			...(maxAppUsers !== undefined && { maxAppUsers })
+		});
+	}
 	return getOrganization(id);
 }

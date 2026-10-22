@@ -37,7 +37,7 @@
 
 			{#if data.member}
 				{@const member = data.member}
-				{#if !member.twoFactorEnabled}
+				{#if member.twoFactorMissing}
 					<Alert variant="warning">
 						Pour entrer avec votre compte console, activez d'abord la double authentification dans la
 						<a href="/securite">console</a>.

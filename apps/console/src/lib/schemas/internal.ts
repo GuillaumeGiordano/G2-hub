@@ -5,7 +5,8 @@ import { MAX_APP_USERS_LIMIT } from '$lib/records/appUsers';
 // Bodies of the internal API (G2 WebDev portal) — DECISIONS.md §27.
 
 /** POST /api/internal/v1/organizations — an organization and its first Admin (§43). The plan is
- *  optional: the defaults of a new organization (1 GB, both offers). */
+ *  optional: the defaults of a new organization (1 GB, both offers). Both offers off is allowed: an
+ *  organization opened at a prospect's first request, its offers come with the contract (§44). */
 export const internalOrganizationCreateSchema = z
 	.object({
 		name: z.string('name requis').trim().min(1, 'name requis').max(120, 'name : 120 caractères au plus'),
@@ -26,12 +27,13 @@ export const internalOrganizationCreateSchema = z
 			.max(MAX_APP_USERS_LIMIT, `maxAppUsers : ${MAX_APP_USERS_LIMIT} au plus`)
 			.default(1000)
 	})
-	.strict()
-	.refine((b) => b.authEnabled || b.storageEnabled, 'Au moins une offre (authEnabled ou storageEnabled).');
+	.strict();
 
-/** PATCH /api/internal/v1/organizations/:id — the plan: a storage tier and / or the offers (§12). */
+/** PATCH /api/internal/v1/organizations/:id — the name (g2-erp is the master of the client's file,
+ *  §44) and / or the plan: a storage tier, the offers (§12, both off allowed). */
 export const internalPlanSchema = z
 	.object({
+		name: z.string('name invalide').trim().min(1, 'name requis').max(120, 'name : 120 caractères au plus').optional(),
 		quotaBytes: z
 			.number('quotaBytes invalide')
 			.int('quotaBytes invalide')

@@ -13,7 +13,7 @@ export function findMembershipsOfUser(userId: string) {
 	return prisma.membership.findMany({
 		where: { userId },
 		orderBy: { organization: { name: 'asc' } },
-		select: { organizationId: true, role: true }
+		select: { organizationId: true, role: true, organization: { select: { authEnabled: true, storageEnabled: true } } }
 	});
 }
 

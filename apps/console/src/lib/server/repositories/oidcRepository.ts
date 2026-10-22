@@ -76,7 +76,7 @@ export function findConsoleAccount(userId: string) {
 			memberships: {
 				where: { role: 'OWNER' },
 				orderBy: { organization: { name: 'asc' } },
-				select: { organization: { select: { id: true, name: true } } }
+				select: { organization: { select: { id: true, name: true, authEnabled: true, storageEnabled: true } } }
 			}
 		}
 	});

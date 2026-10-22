@@ -1,7 +1,7 @@
 import { error, redirect, type Handle, type ServerInit } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { auth } from '$lib/server/auth';
-import { isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
+import { hasActiveOffer, isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
 import {
 	membershipsOf,
 	resolveDefaultOrganization,
@@ -114,7 +114,10 @@ const guard: Handle = async ({ event, resolve }) => {
 		event.locals.orgContext = organization
 			? { userId: actor.id, isSuperadmin: actor.isSuperadmin, organization }
 			: null;
-		event.locals.requiresTwoFactor = requiresTwoFactor(session.user.role, memberships.length > 0);
+		event.locals.requiresTwoFactor = requiresTwoFactor(
+			session.user.role,
+			memberships.some((m) => hasActiveOffer(m.organization))
+		);
 		event.locals.membershipCount = memberships.length;
 	}
 

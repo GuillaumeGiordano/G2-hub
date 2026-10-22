@@ -15,7 +15,7 @@ import {
 	SSO_SCOPES
 } from '$lib/records/sso';
 import { isPlatformApplication, type PlatformAccess } from '$lib/records/platform';
-import { isSuperadmin } from '$lib/records/roles';
+import { hasActiveOffer, isSuperadmin, requiresTwoFactor } from '$lib/records/roles';
 import type { AppUserRole } from '$lib/records/appUsers';
 import type { SignInOutcome } from '$lib/records/signIns';
 import type { SignInClient } from '$lib/viewmodels/signIn';
@@ -227,6 +227,14 @@ export async function signIn(
 type ConsoleAccount = NonNullable<Awaited<ReturnType<typeof oidcRepo.findConsoleAccount>>>;
 type Organization = { id: string; name: string };
 
+/** The organizations of an account as claims carry them: id and name only. */
+const organizationsOf = (account: ConsoleAccount): Organization[] =>
+	account.memberships.map(({ organization: { id, name } }) => ({ id, name }));
+
+/** Must this account have used two-factor authentication to enter an application (§44)? */
+const twoFactorMissing = (account: ConsoleAccount): boolean =>
+	requiresTwoFactor(account.role, account.memberships.some((m) => hasActiveOffer(m.organization))) && !account.twoFactorEnabled;
+
 /** What a console member gets in an application: the `role` sent and, for a TOOL, the
  *  organizations they may enter it for (null: the sign-in is not bound to an organization). */
 type ConsoleGrant = {
@@ -239,8 +247,9 @@ type ConsoleGrant = {
  * sign-in and again at every use of a code or token:
  * - a client's application (NONE): the Admins of its organization, as `admin` (§26) — not the
  *   superadmin, whom the client invites if needed;
- * - the client portal (ALL_ADMINS): every Admin of any organization, as `client` — `admin` for
- *   the superadmin and the Admins of the organization owning it (§38);
+ * - the client portal (ALL_ADMINS): every active console account, even in no organization yet (a
+ *   prospect, §44), as `client` — `admin` for the superadmin and the Admins of the organization
+ *   owning it (§38);
  * - a tool (PER_ORGANIZATION): an Admin, FOR one of their organizations the tool is enabled for;
  *   the superadmin for any organization (§38). Never across organizations.
  */
@@ -250,7 +259,7 @@ async function consoleGrant(
 ): Promise<ConsoleGrant | null> {
 	if (account.disabledAt) return null;
 	const superadmin = isSuperadmin(account.role);
-	const organizations = account.memberships.map((m) => m.organization);
+	const organizations = organizationsOf(account);
 	const owner = organizations.some((o) => o.id === application.organizationId);
 	const role = superadmin || owner ? SSO_ROLE_CLAIM.ADMIN : SSO_ROLE_CLAIM.CLIENT;
 
@@ -259,7 +268,7 @@ async function consoleGrant(
 			// Without the Auth offer, no back-office through the hub either (§12).
 			return owner && application.authEnabled ? { role: SSO_ROLE_CLAIM.ADMIN, organizations: null } : null;
 		case 'ALL_ADMINS':
-			return superadmin || organizations.length ? { role, organizations: null } : null;
+			return { role, organizations: null };
 		case 'PER_ORGANIZATION': {
 			if (superadmin) return { role, organizations: await oidcRepo.listOrganizations() };
 			const enabled = await oidcRepo.findToolOrganizationIds(application.id);
@@ -271,7 +280,8 @@ async function consoleGrant(
 
 export type ConsoleSignIn = {
 	name: string;
-	twoFactorEnabled: boolean;
+	/** Two-factor authentication is required for this account and not set up yet (§44). */
+	twoFactorMissing: boolean;
 	role: ConsoleGrant['role'];
 	/** A tool: the organizations to choose from (only the requested one when it is allowed). */
 	organizations: Organization[] | null;
@@ -288,7 +298,7 @@ export async function consoleSignIn(request: AuthorizeRequest, userId: string): 
 	const requested = grant.organizations?.find((o) => o.id === request.organizationId);
 	return {
 		name: account.name,
-		twoFactorEnabled: account.twoFactorEnabled,
+		twoFactorMissing: twoFactorMissing(account),
 		role: grant.role,
 		organizations: requested ? [requested] : grant.organizations,
 		requestedUnavailable: !!request.organizationId && !!grant.organizations && !requested
@@ -297,7 +307,7 @@ export async function consoleSignIn(request: AuthorizeRequest, userId: string): 
 
 /**
  * Continue with the console session (`signedInAt` = when, for `auth_time`), for `organizationId`
- * when the application is a tool. Their 2FA must be on — it is mandatory for every member, and the
+ * when the application is a tool. Their 2FA must be on when it is mandatory for them (§44) — the
  * session then proves it was used.
  */
 export async function signInAsConsoleMember(
@@ -310,7 +320,7 @@ export async function signInAsConsoleMember(
 	const account = await oidcRepo.findConsoleAccount(userId);
 	const grant = account && (await consoleGrant(account, request.application));
 	if (!account || !grant) return { ok: false, message: "Votre compte n'a pas accès à cette application." };
-	if (!account.twoFactorEnabled) {
+	if (twoFactorMissing(account)) {
 		return { ok: false, message: 'Activez d’abord la double authentification dans la console (page Sécurité).' };
 	}
 	const organization = grant.organizations?.find((o) => o.id === organizationId) ?? null;
@@ -501,7 +511,7 @@ async function activeHolder(row: HolderRow, applicationId: string): Promise<Hold
 		organization,
 		// Only the client portal learns them: a client's application never sees the OTHER
 		// organizations of its Admin (§38).
-		organizations: application.platformAccess === 'ALL_ADMINS' ? account.memberships.map((m) => m.organization) : null,
+		organizations: application.platformAccess === 'ALL_ADMINS' ? organizationsOf(account) : null,
 		ref: organization ? { userId: account.id, organizationId: organization.id } : { userId: account.id }
 	};
 }

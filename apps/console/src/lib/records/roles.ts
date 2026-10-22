@@ -12,11 +12,16 @@ export function isSuperadmin(role: string | null | undefined): boolean {
 	return role === 'superadmin';
 }
 
-/** Two-factor auth is mandatory for the superadmin and for every organization Admin
- *  (DECISIONS.md §9, §26). `isMember`: the account belongs to at least one organization. */
-export function requiresTwoFactor(role: string | null | undefined, isMember = false): boolean {
-	return isSuperadmin(role) || isMember;
+/** Two-factor auth is mandatory for the superadmin and for the Admin of an organization with an
+ *  active offer — the one who opens the console (DECISIONS.md §9, §26, §44). An account without
+ *  console (a prospect, a client without plan) signs in to the portal with its password alone. */
+export function requiresTwoFactor(role: string | null | undefined, adminWithOffer = false): boolean {
+	return isSuperadmin(role) || adminWithOffer;
 }
+
+/** An organization with at least one offer (§12): its Admins open the console. */
+export const hasActiveOffer = (organization: { authEnabled: boolean; storageEnabled: boolean }): boolean =>
+	organization.authEnabled || organization.storageEnabled;
 
 /** Human label of a stored role (an unknown value is shown as is). */
 export function labelForRole(role: string | null | undefined): string {
