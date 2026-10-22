@@ -6,7 +6,10 @@ import type { LayoutServerLoad } from './$types';
 // Access (signed in + mandatory 2FA + active organization for (org) pages) is enforced centrally
 // in hooks.server.ts; here the user, its active organization and its navigation rights are
 // surfaced to the pages (the user is guaranteed non-null by the hook).
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, params }) => {
+	// The organization comes from the address (/o/<id>) through the hook: reading params.org makes
+	// SvelteKit rerun this load when it changes — a client-side navigation keeps the old data otherwise.
+	void params.org;
 	const user = locals.user!;
 	const superadmin = isSuperadmin(user.role);
 	const organization = locals.organization;
