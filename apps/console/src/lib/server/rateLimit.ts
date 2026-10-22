@@ -36,3 +36,5 @@ export function allowHit(key: string | null, max: number, windowMs: number): boo
 export const SIGN_IN_PER_IP = { max: 20, windowMs: 5 * 60_000 };
 /** « Mot de passe oublié » requests from one IP address. */
 export const RESET_PER_IP = { max: 5, windowMs: 15 * 60_000 };
+/** Sign-up requests from one IP address (§45). */
+export const SIGNUP_PER_IP = { max: 5, windowMs: 15 * 60_000 };

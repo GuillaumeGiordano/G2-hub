@@ -23,7 +23,7 @@ async function settingsOrThrow(ctx: OrgContext, applicationId: string) {
 export async function getSso(ctx: OrgContext, applicationId: string): Promise<SsoSettings> {
 	const app = await settingsOrThrow(ctx, applicationId);
 	return {
-		application: { id: app.id, name: app.name },
+		application: { id: app.id, name: app.name, platformAccess: app.platformAccess },
 		enabled: app.ssoSecretHash !== null,
 		clientId: app.id,
 		secretPrefix: app.ssoSecretPrefix,

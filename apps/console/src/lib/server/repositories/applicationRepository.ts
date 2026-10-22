@@ -22,7 +22,7 @@ export async function listApplicationIds(organizationId: string) {
 export function findApplication(organizationId: string, id: string) {
 	return prisma.application.findFirst({
 		where: { id, organizationId },
-		select: { id: true, name: true }
+		select: { id: true, name: true, platformAccess: true }
 	});
 }
 

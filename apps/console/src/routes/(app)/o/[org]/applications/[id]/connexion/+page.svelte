@@ -19,7 +19,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const sso = $derived(data.sso);
-	const tabs = $derived(applicationTabs(page.params.org!, sso.application.id, true, page.data.organization?.authEnabled ?? false));
+	const tabs = $derived(applicationTabs(page.params.org!, sso.application, true, page.data.organization?.authEnabled ?? false));
 	const crumbs = $derived([
 		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },
 		{ label: sso.application.name, href: orgPath(page.params.org!, `/applications/${sso.application.id}`) },

@@ -82,3 +82,30 @@ export function consoleInvitationMail(c: {
 		html: layout([intro, body], { label: 'Activer mon compte', url: c.link }, footer)
 	};
 }
+
+/** Sign-up (DECISIONS.md §45): confirm the address, then choose a password. */
+export function signupConfirmMail(c: { to: string; name: string; hubName: string; link: string; validHours: number }): Mail {
+	const intro = `Bonjour ${c.name},`;
+	const body = `Vous venez de créer votre compte ${c.hubName}. Confirmez votre adresse et choisissez votre mot de passe pour continuer.`;
+	const footer = `Ce lien est valable ${c.validHours} heures et ne sert qu'une fois. Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail : le compte sera supprimé.`;
+	return {
+		to: c.to,
+		subject: `Confirmez votre adresse — ${c.hubName}`,
+		text: `${intro}\n\n${body}\n\n${c.link}\n\n${footer}\n`,
+		html: layout([intro, body], { label: 'Confirmer mon adresse', url: c.link }, footer)
+	};
+}
+
+/** Sign-up with an address that already has an account: the same screen, but this e-mail instead
+ *  (the page never reveals who is registered). */
+export function signupAlreadyRegisteredMail(c: { to: string; hubName: string; link: string }): Mail {
+	const intro = 'Bonjour,';
+	const body = `Une inscription vient d'être demandée avec cette adresse, mais vous avez déjà un compte ${c.hubName}. Connectez-vous avec votre mot de passe habituel (ou « Mot de passe oublié ? » sur la page de connexion).`;
+	const footer = "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : rien n'a changé sur votre compte.";
+	return {
+		to: c.to,
+		subject: `Vous avez déjà un compte — ${c.hubName}`,
+		text: `${intro}\n\n${body}\n\n${c.link}\n\n${footer}\n`,
+		html: layout([intro, body], { label: 'Me connecter', url: c.link }, footer)
+	};
+}

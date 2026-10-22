@@ -2,6 +2,7 @@ import * as jobRepo from '$lib/server/repositories/mediaJobRepository';
 import { cleanupAbandonedUploads, failVideo, processQueuedVideo } from '$lib/server/services/fileService';
 import { purgeExpiredGrants } from '$lib/server/services/oidcService';
 import { purgeOldSignIns } from '$lib/server/services/signInLogService';
+import { purgeUnconfirmedSignups } from '$lib/server/services/signupService';
 import { setWaker } from './signal';
 
 // Single in-process worker draining the media queue, one job at a time (DECISIONS.md §5) —
@@ -48,6 +49,12 @@ async function loop(): Promise<void> {
 			await purgeExpiredGrants().catch((err) => console.error('[oidc] purge failed:', err));
 			// And the sign-in log beyond its retention (§40).
 			await purgeOldSignIns().catch((err) => console.error('[sign-in log] purge failed:', err));
+			// And the sign-ups never confirmed (§45).
+			const unconfirmed = await purgeUnconfirmedSignups().catch((err) => {
+				console.error('[sign-up] purge failed:', err);
+				return 0;
+			});
+			if (unconfirmed) console.log(`[sign-up] removed ${unconfirmed} unconfirmed account(s)`);
 		}
 
 		let job: jobRepo.ClaimedJob | null = null;

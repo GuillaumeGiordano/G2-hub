@@ -1,6 +1,8 @@
+import type { PlatformAccess } from '$lib/records/platform';
+
 /** « Se connecter avec G2 Hub » settings of an application (console, owners). */
 export type SsoSettings = {
-	application: { id: string; name: string };
+	application: { id: string; name: string; platformAccess: PlatformAccess };
 	enabled: boolean;
 	/** The application id — public, goes in the portal's configuration. */
 	clientId: string;

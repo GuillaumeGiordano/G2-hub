@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { Alert, Button, Input } from '@guillaumeg/ui';
-	import { Building2, LogIn, ShieldCheck } from '@lucide/svelte';
+	import { Building2, LogIn, ShieldCheck, UserPlus } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 
 	// Sign-in to a client's portal with the account of THAT application — or, for a console member
-	// signed in who may enter it, with that session (§26), for one organization on a tool (§38).
+	// signed in who may enter it, with that session (§26), for one organization on a tool (§38). An
+	// application of the platform is entered with a console account only, created here if needed (§45).
 	// Plain form posts (no
 	// enhance): on success the answer redirects to the portal — another site — which the browser
 	// follows natively.
@@ -65,32 +66,46 @@
 						</Button>
 					</form>
 				{/if}
-				<div class="separator">ou avec un compte utilisateur</div>
+				{#if !data.platform}<div class="separator">ou avec un compte utilisateur</div>{/if}
+			{:else if data.platform && data.consoleSignedIn}
+				<Alert variant="info">Votre compte n'a pas accès à {data.application.name}.</Alert>
 			{/if}
 
-			<form method="POST" class="form" onsubmit={() => (busy = true)}>
-				<Input
-					label="E-mail"
-					name="email"
-					type="email"
-					autocomplete="username"
-					value={form?.email ?? data.loginHint ?? ''}
-					required
-				/>
-				<Input label="Mot de passe" name="password" type="password" autocomplete="current-password" required />
-				<Button
-					addClass="w-full"
-					loading={busy}
-					size="lg"
-					type="submit"
-					variant={data.member ? 'outline' : 'primary'}
-				>
-					Se connecter
-				</Button>
-			</form>
-			<a class="forgot" href={`/mot-de-passe-oublie?app=${data.application.id}`}>Mot de passe oublié ?</a>
-			{#if !data.consoleSignedIn}
-				<a class="forgot" href={consoleLogin}>Vous êtes administrateur ? Connectez-vous à la console</a>
+			{#if data.platform}
+				<!-- An application of the platform: console accounts only, no application users (§45). -->
+				{#if !data.consoleSignedIn}
+					<div class="form">
+						<Button href={consoleLogin} addClass="w-full" icon={LogIn} size="lg">Se connecter</Button>
+						{#if data.signupHref}
+							<Button href={data.signupHref} addClass="w-full" icon={UserPlus} size="lg" variant="outline">Créer un compte</Button>
+						{/if}
+					</div>
+				{/if}
+			{:else}
+				<form method="POST" class="form" onsubmit={() => (busy = true)}>
+					<Input
+						label="E-mail"
+						name="email"
+						type="email"
+						autocomplete="username"
+						value={form?.email ?? data.loginHint ?? ''}
+						required
+					/>
+					<Input label="Mot de passe" name="password" type="password" autocomplete="current-password" required />
+					<Button
+						addClass="w-full"
+						loading={busy}
+						size="lg"
+						type="submit"
+						variant={data.member ? 'outline' : 'primary'}
+					>
+						Se connecter
+					</Button>
+				</form>
+				<a class="forgot" href={`/mot-de-passe-oublie?app=${data.application.id}`}>Mot de passe oublié ?</a>
+				{#if !data.consoleSignedIn}
+					<a class="forgot" href={consoleLogin}>Vous êtes administrateur ? Connectez-vous à la console</a>
+				{/if}
 			{/if}
 		{:else}
 			<Alert variant="error" title="Connexion impossible">{data.fatal}</Alert>

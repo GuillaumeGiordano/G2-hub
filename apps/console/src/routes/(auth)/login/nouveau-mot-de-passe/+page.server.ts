@@ -3,6 +3,7 @@ import { parseForm } from '$lib/validation';
 import { consolePasswordResetSchema } from '$lib/schemas/account';
 import { actionFailure } from '$lib/server/http';
 import * as accountService from '$lib/server/services/accountService';
+import { safeRedirect } from '$lib/utils/redirect';
 import type { Actions, PageServerLoad } from './$types';
 
 // A console account chooses a new password from its e-mailed link (`?token=`, DECISIONS.md §30).
@@ -10,8 +11,16 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	// The token is in the URL: never send it to another site, never cache the page.
 	setHeaders({ 'referrer-policy': 'same-origin', 'cache-control': 'no-store' });
 	const token = url.searchParams.get('token') ?? '';
-	// `invitation=1`: the link comes from an invitation (same mechanism, other wording).
-	return { token, invitation: url.searchParams.has('invitation'), valid: await accountService.resetLinkIsValid(token) };
+	// `invitation=1`: the link comes from an invitation (same mechanism, other wording); `inscription=1`
+	// from a sign-up (§45), whose `returnTo` (the portal's authorize request) follows the sign-in.
+	const returnTo = safeRedirect(url.searchParams.get('returnTo'));
+	return {
+		token,
+		invitation: url.searchParams.has('invitation'),
+		signup: url.searchParams.has('inscription'),
+		loginHref: returnTo.startsWith('/oauth/authorize?') ? `/login?${new URLSearchParams({ redirectTo: returnTo })}` : '/login',
+		valid: await accountService.resetLinkIsValid(token)
+	};
 };
 
 export const actions: Actions = {

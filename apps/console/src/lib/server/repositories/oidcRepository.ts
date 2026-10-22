@@ -10,7 +10,7 @@ import { prisma } from '$lib/server/db';
 export function findSsoSettings(organizationId: string, applicationId: string) {
 	return prisma.application.findFirst({
 		where: { id: applicationId, organizationId },
-		select: { id: true, name: true, ssoSecretHash: true, ssoSecretPrefix: true, ssoRedirectUris: true }
+		select: { id: true, name: true, platformAccess: true, ssoSecretHash: true, ssoSecretPrefix: true, ssoRedirectUris: true }
 	});
 }
 

@@ -9,7 +9,8 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let email = $state('');
+	// `?email=` prefills the address (the « you already have an account » e-mail of a sign-up, §45).
+	let email = $state(page.url.searchParams.get('email') ?? '');
 	let password = $state('');
 	let loading = $state(false);
 	let formError = $state('');

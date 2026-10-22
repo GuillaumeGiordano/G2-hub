@@ -22,7 +22,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const tabs = $derived(
-		applicationTabs(page.params.org!, data.application.id, data.canManageKeys, page.data.organization?.authEnabled ?? false)
+		applicationTabs(page.params.org!, data.application, data.canManageKeys, page.data.organization?.authEnabled ?? false)
 	);
 	const crumbs = $derived([
 		{ label: 'Applications', href: orgPath(page.params.org!, '/applications') },

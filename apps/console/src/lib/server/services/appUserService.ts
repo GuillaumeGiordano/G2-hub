@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Prisma } from '@g2-hub/db';
 import { prisma } from '$lib/server/db';
 import * as userRepo from '$lib/server/repositories/appUserRepository';
+import * as platformRepo from '$lib/server/repositories/platformRepository';
 import * as fileRepo from '$lib/server/repositories/fileRepository';
 import { purgeObjects } from '$lib/server/storage/purge';
 import { appUserStatus, toAppUserListItem } from '$lib/server/mappers/appUserMapper';
@@ -18,6 +19,7 @@ import {
 	type AppUserRole,
 	type AppUserStatus
 } from '$lib/records/appUsers';
+import { isPlatformApplication } from '$lib/records/platform';
 import type { AppUserListItem, AppUserUsage, PasswordLink } from '$lib/viewmodels/appUser';
 import type { SignInClient } from '$lib/viewmodels/signIn';
 import { recordSignIn } from './signInLogService';
@@ -61,6 +63,11 @@ type InviteInput = { name: string; email: string; role: AppUserRole };
  * cannot be sent, the account is removed again: an invitation nobody received helps no one.
  */
 export async function invite(scope: InviteScope, input: InviteInput): Promise<InvitedAppUser> {
+	// The portal and the tools are entered with a console account, never with application users (§45).
+	const platform = await platformRepo.findPlatformSettings(scope.organizationId, scope.applicationId);
+	if (platform && isPlatformApplication(platform.platformAccess)) {
+		throw new HubError("Une application de la plateforme n'a pas d'utilisateurs : on s'y connecte avec un compte de la console.");
+	}
 	const email = normalizeEmail(input.email);
 	const existing = await userRepo.findAppUserByEmail(scope.applicationId, email);
 	if (existing) throw alreadyThere(existing.passwordHash !== null);
@@ -133,7 +140,8 @@ export async function listAppUsers(
 ): Promise<{ items: AppUserListItem[]; total: number }> {
 	assertCan(ctx, 'read');
 	assertAuthEnabled(ctx);
-	await applicationOrThrow(ctx, applicationId);
+	const app = await applicationOrThrow(ctx, applicationId);
+	if (isPlatformApplication(app.platformAccess)) throw notFound('Application introuvable.');
 	const [rows, total] = await Promise.all([
 		userRepo.searchAppUsers({
 			organizationId: ctx.organization.id,

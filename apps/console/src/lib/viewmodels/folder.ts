@@ -1,4 +1,5 @@
 import type { FolderLock, Visibility } from '$lib/records/storage';
+import type { PlatformAccess } from '$lib/records/platform';
 
 /** A folder in the browser list. */
 export type FolderListItem = {
@@ -16,7 +17,7 @@ export type FolderCrumb = { id: string; name: string };
 
 /** What the file browser shows for one application and (optionally) one folder. */
 export type FolderBrowser = {
-	application: { id: string; name: string };
+	application: { id: string; name: string; platformAccess: PlatformAccess };
 	/** null = the application's root. */
 	folder: { id: string; name: string; visibility: Visibility; lock: FolderLock } | null;
 	/** Ancestors of `folder`, root first (excluding `folder` itself). */

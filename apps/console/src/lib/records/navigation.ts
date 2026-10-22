@@ -2,6 +2,7 @@
 // and renders the @guillaumeg/ui <Sidebar> (desktop) and the mobile drawer. Add a link HERE only.
 import type { Component } from 'svelte';
 import { orgPath } from '$lib/utils/orgPath';
+import { isPlatformApplication, type PlatformAccess } from '$lib/records/platform';
 import { AppWindow, Building, Building2, LayoutDashboard, LayoutGrid, ShieldCheck, Users } from '@lucide/svelte';
 
 /** What the current user can reach — decides which links show. */
@@ -109,14 +110,20 @@ export function resolveNavItem(item: NavItem, ctx: NavContext): { label: string;
 }
 
 /** Tabs of one application's pages (« Fichiers » and « Utilisateurs » — with the Auth offer, §12 —
- *  for every member; « Clés API » and « Connexion » only for those who manage applications). */
-export function applicationTabs(organizationId: string, applicationId: string, canManage: boolean, authEnabled: boolean) {
-	const base = orgPath(organizationId, `/applications/${applicationId}`);
+ *  for every member; « Clés API » and « Connexion » only for those who manage applications). An
+ *  application of the platform has no application users (§45): no « Utilisateurs » tab. */
+export function applicationTabs(
+	organizationId: string,
+	application: { id: string; platformAccess: PlatformAccess },
+	canManage: boolean,
+	authEnabled: boolean
+) {
+	const base = orgPath(organizationId, `/applications/${application.id}`);
 	return [
 		{ label: 'Fichiers', href: base },
 		...(authEnabled
 			? [
-					{ label: 'Utilisateurs', href: `${base}/utilisateurs` },
+					...(isPlatformApplication(application.platformAccess) ? [] : [{ label: 'Utilisateurs', href: `${base}/utilisateurs` }]),
 					{ label: 'Journal des connexions', href: `${base}/journal` }
 				]
 			: []),

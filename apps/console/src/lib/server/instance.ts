@@ -14,3 +14,9 @@ export const hubUrl = (): string => env.ORIGIN || (dev ? 'http://localhost:5180'
 /** Where an Admin asks for more space (« Demander plus d'espace »): the G2 WebDev portal, a contact
  *  page or a mailto:. Empty = no button (e.g. a copy delivered to a client). */
 export const upgradeUrl = (): string | null => env.UPGRADE_URL || null;
+
+/** The privacy policy the sign-up form links to (DECISIONS.md §45). */
+export const privacyUrl = (): string | null => env.PRIVACY_URL || null;
+
+/** Public sign-up of console accounts (§45): off unless enabled AND a privacy policy is set. */
+export const signupEnabled = (): boolean => env.SIGNUP_ENABLED === 'true' && !!privacyUrl();

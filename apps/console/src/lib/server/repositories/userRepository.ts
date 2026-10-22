@@ -146,3 +146,18 @@ export function countConsoleAccounts(search?: string) {
 export function deleteUser(id: string, tx: Prisma.TransactionClient = prisma) {
 	return tx.user.delete({ where: { id }, select: { id: true } });
 }
+
+/** Remove the accounts never confirmed (no password chosen from their link), in no organization,
+ *  never signed in, created before `before` — never a superadmin (DECISIONS.md §45). */
+export async function deleteUnconfirmedAccounts(before: Date): Promise<number> {
+	const { count } = await prisma.user.deleteMany({
+		where: {
+			emailVerified: false,
+			role: { not: 'superadmin' },
+			createdAt: { lt: before },
+			memberships: { none: {} },
+			sessions: { none: {} }
+		}
+	});
+	return count;
+}

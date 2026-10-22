@@ -14,7 +14,7 @@ import {
 	SSO_ROLE_CLAIM,
 	SSO_SCOPES
 } from '$lib/records/sso';
-import type { PlatformAccess } from '$lib/records/platform';
+import { isPlatformApplication, type PlatformAccess } from '$lib/records/platform';
 import { isSuperadmin } from '$lib/records/roles';
 import type { AppUserRole } from '$lib/records/appUsers';
 import type { SignInOutcome } from '$lib/records/signIns';
@@ -176,8 +176,11 @@ export async function signIn(
 ): Promise<SignInResult> {
 	const normalized = email.trim().toLowerCase();
 	const key = `${request.application.id}:${normalized}`;
-	// Application users belong to the Auth offer of the organization owning the application (§12).
-	if (!request.application.authEnabled) return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
+	// Application users belong to the Auth offer of the organization owning the application (§12) —
+	// and never to an application of the platform, entered with a console account only (§45).
+	if (!request.application.authEnabled || isPlatformApplication(request.application.platformAccess)) {
+		return { ok: false, message: 'E-mail ou mot de passe incorrect.' };
+	}
 	// Per IP address too (§41): the per-address limit below cannot stop one password tried on many
 	// addresses. Not logged: a flood would otherwise fill the sign-in log.
 	if (!allowHit(client.ipAddress && `sign-in:${client.ipAddress}`, SIGN_IN_PER_IP.max, SIGN_IN_PER_IP.windowMs)) {

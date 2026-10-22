@@ -4,6 +4,10 @@
 export const PLATFORM_ACCESSES = ['NONE', 'ALL_ADMINS', 'PER_ORGANIZATION'] as const;
 export type PlatformAccess = (typeof PLATFORM_ACCESSES)[number];
 
+/** An application of the platform (portal or tool): entered with a console account, never with
+ *  application users (DECISIONS.md §45). */
+export const isPlatformApplication = (access: PlatformAccess): boolean => access !== 'NONE';
+
 export const platformAccessLabel: Record<PlatformAccess, string> = {
 	NONE: 'Application du client',
 	ALL_ADMINS: 'Portail de la plateforme',
